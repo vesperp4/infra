@@ -25,7 +25,7 @@ Security Defaults). That doc covers *people*; this covers *workloads*.
 |---|---|---|
 | `id-github-acr-push` | `repo:vesperp4/mono:environment:azure-acr` | `AcrPush` on ACR |
 | `id-github-deploy-dev` | `repo:vesperp4/infra:environment:dev` | `Contributor` on `vesperp4-dev-rg`, `Key Vault Secrets User` on dev KV |
-| `id-github-deploy-prod` | `repo:vesperp4/infra:environment:production` | `Contributor` on `vesperp4-prod-rg`, `Key Vault Secrets User` on prod KV |
+| `id-github-deploy-prod` | `repo:vesperp4/infra:environment:prod` | `Contributor` on `vesperp4-prod-rg`, `Key Vault Secrets User` on prod KV |
 | `id-app-dev` | *(runtime only — no GitHub federation)* | `AcrPull` on ACR, `Key Vault Secrets User` on dev KV |
 | `id-app-prod` | *(runtime only)* | `AcrPull` on ACR, `Key Vault Secrets User` on prod KV |
 
@@ -45,9 +45,9 @@ vaults so admins can seed/rotate the Postgres password.
   Azure trusts it via the federated credential. There is **no client secret** to
   store, rotate, or leak.
 - **Environment-scoped subjects.** Each credential is pinned to a specific repo
-  **and** GitHub environment (`environment:dev`, `environment:production`,
+  **and** GitHub environment (`environment:dev`, `environment:prod`,
   `environment:azure-acr`). A workflow can only assume an identity from the exact
-  environment it's authorized for — and the `production` environment carries a
+  environment it's authorized for — and the `prod` environment carries a
   reviewer gate, so prod deploys require human approval before the token is even
   issued.
 - **Least privilege, per purpose + per env.** Push is `AcrPush` on the registry
@@ -110,7 +110,7 @@ az keyvault secret set --vault-name vesperp4-prod-kv --name postgres-admin-passw
   Add `environment: azure-acr` to the `build-and-push` job in
   `.github/workflows/website-api-build.yaml` so its OIDC subject matches.
 - **infra repo (`vesperp4/infra`)**: environments **`dev`** (no gate) and
-  **`production`** (required reviewers).
+  **`prod`** (required reviewers).
 
 ### 3. Set GitHub secrets / variables (from outputs)
 
@@ -121,7 +121,7 @@ az keyvault secret set --vault-name vesperp4-prod-kv --name postgres-admin-passw
 | mono | repo secret | `AZURE_CLIENT_ID` | `idAcrPushClientId` |
 | mono | repo var | `ACR_NAME` / `ACR_LOGIN_SERVER` | `acrNameOut` / `acrLoginServer` |
 | infra | `dev` env secret | `AZURE_CLIENT_ID` | `idDeployDevClientId` |
-| infra | `production` env secret | `AZURE_CLIENT_ID` | `idDeployProdClientId` |
+| infra | `prod` env secret | `AZURE_CLIENT_ID` | `idDeployProdClientId` |
 | infra | repo secret | `AZURE_TENANT_ID` / `AZURE_SUBSCRIPTION_ID` | `tenantId` / `subscriptionId` |
 
 The per-environment `AZURE_CLIENT_ID` is what makes each deploy use its own

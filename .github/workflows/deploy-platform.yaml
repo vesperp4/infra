@@ -2,7 +2,7 @@ name: Deploy Platform
 
 # Deploys the per-environment shared platform (PostgreSQL server + Container Apps
 # environment). Runs on changes to the platform Bicep/params, or on demand. Prod
-# is gated by the `production` environment's required reviewers.
+# is gated by the `prod` environment's required reviewers.
 on:
   push:
     branches: [main]
@@ -69,7 +69,7 @@ jobs:
     needs: changes
     if: ${{ needs.changes.outputs.prod == 'true' || github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
-    environment: production # required-reviewer approval gate
+    environment: prod # required-reviewer approval gate
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
       - name: Azure login (OIDC)

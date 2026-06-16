@@ -80,7 +80,7 @@ GRANT ALL PRIVILEGES ON DATABASE vesperp4_api TO "id-app-dev";
 
 - Region `eastus2`, subscription `1e180171-becb-40cd-a4a0-52351087be66`.
 - Compiled JSON is gitignored. `mise run lint` compiles all Bicep + params locally.
-- Actions are SHA-pinned. Prod deploys are gated by the `production` GitHub
+- Actions are SHA-pinned. Prod deploys are gated by the `prod` GitHub
   environment's required reviewers.
 
 ## Related

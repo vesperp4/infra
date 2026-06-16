@@ -142,7 +142,7 @@ module idDeployProd 'modules/managed-identity.bicep' = {
     federatedCredentials: [
       {
         name: 'infra-prod'
-        subject: 'repo:${githubOrg}/${infraRepo}:environment:production'
+        subject: 'repo:${githubOrg}/${infraRepo}:environment:prod'
       }
     ]
   }
