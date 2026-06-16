@@ -3,7 +3,7 @@ using '../../bicep/app.bicep'
 param environment = 'dev'
 
 // Bumped automatically by the monorepo release pipeline (patch-bicepparam.sh).
-param imageTag = '0.1.0'
+param imageTag = '0.2.1'
 
 // Admin password for this app's Postgres server, read from Key Vault at deploy
 // time by the deploy identity (Key Vault Secrets User). Seeded per the runbook.
