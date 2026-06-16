@@ -37,6 +37,12 @@ param aadAdminName string
 @allowed(['User', 'Group', 'ServicePrincipal'])
 param aadAdminPrincipalType string = 'Group'
 
+@description('Object (principal) ID of the CI deploy identity — a second Entra admin so the pipeline can create the app DB role')
+param deployAdminObjectId string
+
+@description('Name of the CI deploy identity (its Postgres admin login name)')
+param deployAdminName string
+
 param tenantId string = tenant().tenantId
 
 resource pg 'Microsoft.DBforPostgreSQL/flexibleServers@2024-08-01' = {
@@ -87,6 +93,19 @@ resource aadAdmin 'Microsoft.DBforPostgreSQL/flexibleServers/administrators@2024
   }
 }
 
+// Second Entra admin: the CI deploy identity, so deploy-app.yaml can run
+// pgaadauth_create_principal for the app's runtime identity without a human.
+resource deployAdmin 'Microsoft.DBforPostgreSQL/flexibleServers/administrators@2024-08-01' = {
+  parent: pg
+  name: deployAdminObjectId
+  properties: {
+    principalType: 'ServicePrincipal'
+    principalName: deployAdminName
+    tenantId: tenantId
+  }
+  dependsOn: [aadAdmin]
+}
+
 // Children are serialized via dependsOn — Flexible Server rejects concurrent
 // control-plane writes ("server is busy" 409s) during provisioning.
 resource db 'Microsoft.DBforPostgreSQL/flexibleServers/databases@2024-08-01' = {
@@ -96,7 +115,7 @@ resource db 'Microsoft.DBforPostgreSQL/flexibleServers/databases@2024-08-01' = {
     charset: 'UTF8'
     collation: 'en_US.utf8'
   }
-  dependsOn: [aadAdmin]
+  dependsOn: [deployAdmin]
 }
 
 // Allow access from Azure services (Container Apps egress) over public networking.

@@ -65,6 +65,13 @@ resource acr 'Microsoft.ContainerRegistry/registries@2023-11-01-preview' existin
   scope: resourceGroup(sharedResourceGroupName)
 }
 
+// CI deploy identity — added as a Postgres Entra admin so the deploy workflow
+// can onboard the app's DB role (see scripts/onboard-app-db.sh).
+resource deployIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' existing = {
+  name: 'id-github-deploy-${environment}'
+  scope: resourceGroup(sharedResourceGroupName)
+}
+
 resource cae 'Microsoft.App/managedEnvironments@2024-03-01' existing = {
   name: caeName
 }
@@ -85,6 +92,8 @@ module postgres 'modules/postgres.bicep' = {
     aadAdminObjectId: adminsGroupObjectId
     aadAdminName: 'infra-admins'
     aadAdminPrincipalType: 'Group'
+    deployAdminObjectId: deployIdentity.properties.principalId
+    deployAdminName: deployIdentity.name
   }
 }
 
@@ -111,3 +120,5 @@ module app 'modules/containerapp.bicep' = {
 
 output apiUrl string = 'https://${app.outputs.fqdn}'
 output postgresFqdn string = postgres.outputs.fqdn
+output postgresServerName string = postgres.outputs.name
+output databaseName string = postgres.outputs.databaseName

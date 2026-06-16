@@ -1,16 +1,15 @@
 name: Deploy Platform
 
-# Deploys the per-environment shared platform (PostgreSQL server + Container Apps
-# environment). Runs on changes to the platform Bicep/params, or on demand. Prod
-# is gated by the `prod` environment's required reviewers.
+# Deploys the per-environment shared platform (Container Apps environment). Runs
+# on changes to the platform Bicep/params, or on demand. Prod is gated by the
+# `prod` environment's required reviewers.
 on:
   push:
     branches: [main]
     paths:
       - 'bicep/platform.bicep'
-      - 'bicep/modules/postgres.bicep'
       - 'bicep/modules/containerapps-env.bicep'
-      - 'env/*/platform.bicepparam'
+      - 'platform/*.bicepparam'
       - '.github/workflows/deploy-platform.yaml'
   workflow_dispatch:
 
@@ -38,12 +37,12 @@ jobs:
               - 'bicep/platform.bicep'
               - 'bicep/modules/containerapps-env.bicep'
               - '.github/workflows/deploy-platform.yaml'
-              - 'env/dev/platform.bicepparam'
+              - 'platform/dev.bicepparam'
             prod:
               - 'bicep/platform.bicep'
               - 'bicep/modules/containerapps-env.bicep'
               - '.github/workflows/deploy-platform.yaml'
-              - 'env/prod/platform.bicepparam'
+              - 'platform/prod.bicepparam'
 
   dev:
     needs: changes
@@ -63,7 +62,7 @@ jobs:
           az deployment group create \
             --resource-group vesperp4-dev-rg \
             --name platform-${{ github.run_id }} \
-            --parameters env/dev/platform.bicepparam
+            --parameters platform/dev.bicepparam
 
   prod:
     needs: changes
@@ -83,4 +82,4 @@ jobs:
           az deployment group create \
             --resource-group vesperp4-prod-rg \
             --name platform-${{ github.run_id }} \
-            --parameters env/prod/platform.bicepparam
+            --parameters platform/prod.bicepparam

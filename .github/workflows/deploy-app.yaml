@@ -1,17 +1,19 @@
 name: Deploy App
 
-# Deploys an application stack (Container App + its database) onto the shared
-# platform. The monorepo's release pipeline bumps env/<env>/vesperp4-api.bicepparam
-# and merges here; that push triggers the matching environment deploy. Prod is
-# gated by the `prod` environment's required reviewers.
+# Deploys application stacks (each = its own Postgres server + database +
+# Container App) onto the shared platform. Generic over apps: a new app is just
+# a new apps/<env>/<app>.bicepparam file — this workflow discovers it, deploys
+# it, and onboards its passwordless DB role automatically. Prod is gated by the
+# `prod` environment's required reviewers.
 on:
   push:
     branches: [main]
     paths:
       - 'bicep/app.bicep'
       - 'bicep/modules/containerapp.bicep'
-      - 'bicep/modules/database.bicep'
-      - 'env/*/vesperp4-api.bicepparam'
+      - 'bicep/modules/postgres.bicep'
+      - 'apps/**/*.bicepparam'
+      - 'scripts/onboard-app-db.sh'
       - '.github/workflows/deploy-app.yaml'
   workflow_dispatch:
 
@@ -24,35 +26,56 @@ permissions:
   id-token: write # Azure OIDC login
 
 jobs:
-  changes:
+  discover:
     runs-on: ubuntu-latest
     outputs:
-      dev: ${{ steps.filter.outputs.dev }}
-      prod: ${{ steps.filter.outputs.prod }}
+      matrix: ${{ steps.set.outputs.matrix }}
+      has: ${{ steps.set.outputs.has }}
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
-      - uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4.0.1
-        id: filter
         with:
-          filters: |
-            dev:
-              - 'bicep/app.bicep'
-              - 'bicep/modules/containerapp.bicep'
-              - 'bicep/modules/postgres.bicep'
-              - '.github/workflows/deploy-app.yaml'
-              - 'env/dev/vesperp4-api.bicepparam'
-            prod:
-              - 'bicep/app.bicep'
-              - 'bicep/modules/containerapp.bicep'
-              - 'bicep/modules/postgres.bicep'
-              - '.github/workflows/deploy-app.yaml'
-              - 'env/prod/vesperp4-api.bicepparam'
+          fetch-depth: 0
+      - id: set
+        env:
+          BEFORE: ${{ github.event.before }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          # A change to the shared app template/modules/script redeploys every app;
+          # otherwise only the app param files that changed in this push.
+          shared_re='^(bicep/app\.bicep|bicep/modules/(containerapp|postgres)\.bicep|scripts/onboard-app-db\.sh|\.github/workflows/deploy-app\.yaml)$'
+          if [ "$EVENT" = "workflow_dispatch" ] || [ -z "${BEFORE:-}" ] \
+             || [ "$BEFORE" = "0000000000000000000000000000000000000000" ] \
+             || ! git rev-parse --verify "${BEFORE}^{commit}" >/dev/null 2>&1; then
+            files="$(git ls-files 'apps/*/*.bicepparam')"
+          else
+            changed="$(git diff --name-only "$BEFORE" "${{ github.sha }}")"
+            if echo "$changed" | grep -qE "$shared_re"; then
+              files="$(git ls-files 'apps/*/*.bicepparam')"
+            else
+              files="$(echo "$changed" | grep -E '^apps/[^/]+/[^/]+\.bicepparam$' || true)"
+            fi
+          fi
+          matrix='[]'
+          for f in $files; do
+            env="$(echo "$f" | cut -d/ -f2)"
+            app="$(basename "$f" .bicepparam)"
+            matrix="$(echo "$matrix" | jq -c --arg a "$app" --arg e "$env" '. + [{"app":$a,"environment":$e}]')"
+          done
+          {
+            echo "matrix=$(echo "$matrix" | jq -c '{include: .}')"
+            echo "has=$(echo "$matrix" | jq 'length > 0')"
+          } >> "$GITHUB_OUTPUT"
 
-  dev:
-    needs: changes
-    if: ${{ needs.changes.outputs.dev == 'true' || github.event_name == 'workflow_dispatch' }}
+  deploy:
+    needs: discover
+    if: ${{ needs.discover.outputs.has == 'true' }}
     runs-on: ubuntu-latest
-    environment: dev
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.discover.outputs.matrix) }}
+    # Sets the env-scoped AZURE_CLIENT_ID and (for prod) the reviewer gate.
+    environment: ${{ matrix.environment }}
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
       - name: Azure login (OIDC)
@@ -61,29 +84,26 @@ jobs:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-      - name: Deploy app (dev)
+      - name: Deploy ${{ matrix.app }} (${{ matrix.environment }})
+        id: deploy
         run: |
+          rg="vesperp4-${{ matrix.environment }}-rg"
+          name="${{ matrix.app }}-${{ github.run_id }}"
           az deployment group create \
-            --resource-group vesperp4-dev-rg \
-            --name vesperp4-api-${{ github.run_id }} \
-            --parameters env/dev/vesperp4-api.bicepparam
-
-  prod:
-    needs: changes
-    if: ${{ needs.changes.outputs.prod == 'true' || github.event_name == 'workflow_dispatch' }}
-    runs-on: ubuntu-latest
-    environment: prod # required-reviewer approval gate
-    steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
-      - name: Azure login (OIDC)
-        uses: azure/login@532459ea530d8321f2fb9bb10d1e0bcf23869a43 # v3.0.0
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-      - name: Deploy app (prod)
+            --resource-group "$rg" \
+            --name "$name" \
+            --parameters "apps/${{ matrix.environment }}/${{ matrix.app }}.bicepparam"
+          server="$(az deployment group show -g "$rg" -n "$name" --query properties.outputs.postgresServerName.value -o tsv)"
+          db="$(az deployment group show -g "$rg" -n "$name" --query properties.outputs.databaseName.value -o tsv)"
+          {
+            echo "server=$server"
+            echo "db=$db"
+          } >> "$GITHUB_OUTPUT"
+      - name: Onboard DB role
         run: |
-          az deployment group create \
-            --resource-group vesperp4-prod-rg \
-            --name vesperp4-api-${{ github.run_id }} \
-            --parameters env/prod/vesperp4-api.bicepparam
+          bash scripts/onboard-app-db.sh \
+            "vesperp4-${{ matrix.environment }}-rg" \
+            "${{ steps.deploy.outputs.server }}" \
+            "${{ steps.deploy.outputs.db }}" \
+            "id-app-${{ matrix.environment }}" \
+            "vesperp4-shared-rg"
