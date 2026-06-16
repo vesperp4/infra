@@ -53,7 +53,10 @@ param minReplicas int = (environment == 'prod') ? 1 : 0
 param maxReplicas int = (environment == 'prod') ? 3 : 1
 
 var caeName = 'vesperp4-${environment}-cae'
-var pgName = '${appName}-${environment}-pg'
+// DB region is part of the server name: self-documenting, and collision-proof
+// when the DB region differs from compute (Azure caches a name->region mapping
+// in the RG, so a failed create in one region blocks recreating it in another).
+var pgName = '${appName}-${environment}-${postgresLocation}-pg'
 var containerAppName = '${appName}-${environment}'
 
 // ---------- Shared resources (bootstrap + platform.bicep) ----------
