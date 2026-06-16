@@ -49,6 +49,7 @@ var roles = {
   acrPush: '8311e382-0749-4cb8-b61a-304f252e45ec'
   acrPull: '7f951dda-4ed3-4680-a7ca-43fe172d538d'
   contributor: 'b24988ac-6180-42a0-ab88-20f7382dd24c'
+  reader: 'acdd72a7-3385-48ef-bd42-f606fba81ae7'
   kvSecretsUser: '4633458b-17de-408a-b874-0445c86b69e6'
   kvSecretsOfficer: 'b86a8fe4-44ce-4948-aee5-eccb2c155cd7'
 }
@@ -217,6 +218,26 @@ module raDeployProdRg 'modules/ra-rg.bicep' = {
   params: {
     principalId: idDeployProd.outputs.principalId
     roleDefinitionId: roles.contributor
+  }
+}
+
+// Deploy identities need read access on the shared RG: app.bicep resolves the
+// ACR and the runtime/deploy managed identities there via `existing` lookups.
+module raDeployDevShared 'modules/ra-rg.bicep' = {
+  name: 'ra-deploy-dev-shared'
+  scope: sharedRg
+  params: {
+    principalId: idDeployDev.outputs.principalId
+    roleDefinitionId: roles.reader
+  }
+}
+
+module raDeployProdShared 'modules/ra-rg.bicep' = {
+  name: 'ra-deploy-prod-shared'
+  scope: sharedRg
+  params: {
+    principalId: idDeployProd.outputs.principalId
+    roleDefinitionId: roles.reader
   }
 }
 
