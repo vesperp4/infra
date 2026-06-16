@@ -21,6 +21,9 @@ param databaseName string = 'vesperp4_api'
 
 param location string = resourceGroup().location
 
+@description('Region for the Postgres Flexible Server — split out because some subscriptions are offer-restricted for Postgres in the compute region (e.g. eastus2)')
+param postgresLocation string = location
+
 @description('Shared resource group holding the ACR and runtime identities')
 param sharedResourceGroupName string = 'vesperp4-shared-rg'
 
@@ -82,7 +85,7 @@ module postgres 'modules/postgres.bicep' = {
   name: '${appName}-postgres'
   params: {
     name: pgName
-    location: location
+    location: postgresLocation
     administratorLogin: postgresAdminLogin
     administratorLoginPassword: postgresAdminPassword
     databaseName: databaseName

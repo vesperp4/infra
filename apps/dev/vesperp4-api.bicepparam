@@ -2,6 +2,10 @@ using '../../bicep/app.bicep'
 
 param environment = 'dev'
 
+// eastus2 is offer-restricted for Postgres Flexible Server on this subscription;
+// compute stays in eastus2, the DB sits in adjacent eastus.
+param postgresLocation = 'eastus'
+
 // Bumped automatically by the monorepo release pipeline (patch-bicepparam.sh).
 param imageTag = '0.2.1'
 
