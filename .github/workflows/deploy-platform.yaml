@@ -36,13 +36,11 @@ jobs:
           filters: |
             dev:
               - 'bicep/platform.bicep'
-              - 'bicep/modules/postgres.bicep'
               - 'bicep/modules/containerapps-env.bicep'
               - '.github/workflows/deploy-platform.yaml'
               - 'env/dev/platform.bicepparam'
             prod:
               - 'bicep/platform.bicep'
-              - 'bicep/modules/postgres.bicep'
               - 'bicep/modules/containerapps-env.bicep'
               - '.github/workflows/deploy-platform.yaml'
               - 'env/prod/platform.bicepparam'

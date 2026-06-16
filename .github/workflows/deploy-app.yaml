@@ -38,13 +38,13 @@ jobs:
             dev:
               - 'bicep/app.bicep'
               - 'bicep/modules/containerapp.bicep'
-              - 'bicep/modules/database.bicep'
+              - 'bicep/modules/postgres.bicep'
               - '.github/workflows/deploy-app.yaml'
               - 'env/dev/vesperp4-api.bicepparam'
             prod:
               - 'bicep/app.bicep'
               - 'bicep/modules/containerapp.bicep'
-              - 'bicep/modules/database.bicep'
+              - 'bicep/modules/postgres.bicep'
               - '.github/workflows/deploy-app.yaml'
               - 'env/prod/vesperp4-api.bicepparam'
 

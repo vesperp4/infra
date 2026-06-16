@@ -24,6 +24,9 @@ param administratorLogin string
 @secure()
 param administratorLoginPassword string
 
+@description('Application database name')
+param databaseName string
+
 @description('Object ID of the Entra principal made server admin (passwordless)')
 param aadAdminObjectId string
 
@@ -84,8 +87,19 @@ resource aadAdmin 'Microsoft.DBforPostgreSQL/flexibleServers/administrators@2024
   }
 }
 
+// Children are serialized via dependsOn — Flexible Server rejects concurrent
+// control-plane writes ("server is busy" 409s) during provisioning.
+resource db 'Microsoft.DBforPostgreSQL/flexibleServers/databases@2024-08-01' = {
+  parent: pg
+  name: databaseName
+  properties: {
+    charset: 'UTF8'
+    collation: 'en_US.utf8'
+  }
+  dependsOn: [aadAdmin]
+}
+
 // Allow access from Azure services (Container Apps egress) over public networking.
-// Per-app databases are created by each app's own stack (see modules/database.bicep).
 resource allowAzure 'Microsoft.DBforPostgreSQL/flexibleServers/firewallRules@2024-08-01' = {
   parent: pg
   name: 'AllowAzureServices'
@@ -93,8 +107,9 @@ resource allowAzure 'Microsoft.DBforPostgreSQL/flexibleServers/firewallRules@202
     startIpAddress: '0.0.0.0'
     endIpAddress: '0.0.0.0'
   }
-  dependsOn: [aadAdmin]
+  dependsOn: [db]
 }
 
 output fqdn string = pg.properties.fullyQualifiedDomainName
 output name string = pg.name
+output databaseName string = databaseName

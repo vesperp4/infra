@@ -14,11 +14,11 @@ infra/
 │   │                     identities + federated creds + least-privilege RBAC
 │   └── modules/
 ├── bicep/
-│   ├── platform.bicep    Per-env SHARED platform: PostgreSQL server +
-│   │                     Container Apps environment (+ Log Analytics)
-│   ├── app.bicep         Per-app: a Container App + its OWN database on the
-│   │                     shared server
-│   └── modules/          postgres, containerapps-env, containerapp, database
+│   ├── platform.bicep    Per-env SHARED platform: Container Apps environment
+│   │                     (+ Log Analytics). Compute substrate only.
+│   ├── app.bicep         Per-app: its OWN PostgreSQL server + database + the
+│   │                     Container App
+│   └── modules/          postgres, containerapps-env, containerapp
 ├── env/
 │   ├── dev/              platform.bicepparam + <app>.bicepparam (pinned imageTag)
 │   └── prod/             platform.bicepparam + <app>.bicepparam (pinned imageTag)
@@ -29,31 +29,34 @@ infra/
 
 ## Shared platform vs per-app
 
-PostgreSQL is a **shared, per-environment server** — multiple apps each get their
-**own database** on it, never their own server. So:
+The Container Apps environment is **shared per environment**; PostgreSQL is
+**dedicated per app** for maximum isolation. So:
 
-- `bicep/platform.bicep` stands up the Postgres **server** and the Container Apps
-  **environment** once per env. It rarely changes.
-- `bicep/app.bicep` deploys **one app**: its Container App plus its database on the
-  shared server. Adding a second app = a new `env/<env>/<app>.bicepparam` + a new
-  database name; no new server.
+- `bicep/platform.bicep` stands up the Container Apps **environment** (the shared
+  compute substrate) once per env. It rarely changes.
+- `bicep/app.bicep` deploys **one app**: its **own** PostgreSQL Flexible Server +
+  database, plus its Container App. Adding a second app = a new
+  `env/<env>/<app>.bicepparam` (its own server name, database, and Key Vault
+  password secret). Apps never share a database server.
 
 ## Order of operations
 
 1. **Bootstrap** the identity/foundation once (admin-run) — `bootstrap/README.md`.
 2. **Wire GitHub** environments + secrets/variables from the bootstrap outputs.
-3. **Seed** each env's Postgres password into Key Vault (bootstrap runbook).
+3. **Seed** each app's Postgres password secret into the env Key Vault — secret
+   name `<app>-pg-admin-password` (e.g. `vesperp4-api-pg-admin-password`).
 4. **Deploy the platform** per env (`deploy-platform.yaml`, or `mise`/`az` locally).
-5. **Onboard the app's Entra DB role** (passwordless — one-time, see below).
+5. **Onboard the app's Entra DB role** on that app's server (passwordless — see below).
 6. **Deploy apps** — the monorepo bumps `env/<env>/<app>.bicepparam` and merging
    triggers `deploy-app.yaml`.
 
 ## PostgreSQL auth — passwordless first
 
-The server is created with **Entra auth enabled** and the `infra-admins` group as
-the Entra administrator. Password auth is left **enabled as an escape hatch** (the
-`pgadmin` password is in Key Vault); flip `passwordAuth: 'Disabled'` in
-`modules/postgres.bicep` to harden once the app is on tokens.
+Each app's server is created with **Entra auth enabled** and the `infra-admins`
+group as the Entra administrator. Password auth is left **enabled as an escape
+hatch** (the `pgadmin` password lives in Key Vault as `<app>-pg-admin-password`);
+flip `passwordAuth: 'Disabled'` in `modules/postgres.bicep` to harden once the app
+is on tokens.
 
 The Container App ships **no DB password**. It authenticates with an Entra token
 from its managed identity (`id-app-<env>`): the app reads `PGHOST/PGUSER/PGDATABASE`
