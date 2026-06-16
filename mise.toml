@@ -1,0 +1,16 @@
+[tools]
+# Azure CLI provides the Bicep CLI via `az bicep`.
+azure = "latest"
+gh = "latest"
+
+[tasks.lint]
+description = "Compile/lint all Bicep (no deploy)"
+run = "az bicep build --file bootstrap/main.bicep --stdout > /dev/null && echo 'bootstrap OK'"
+
+[tasks.bootstrap-whatif]
+description = "Preview the bootstrap deployment (requires az login as an admin)"
+run = "az deployment sub what-if --location eastus2 --template-file bootstrap/main.bicep --parameters bootstrap/main.bicepparam"
+
+[tasks.bootstrap-deploy]
+description = "Deploy the identity/foundation bootstrap (requires az login as an admin)"
+run = "az deployment sub create --name vesperp4-bootstrap --location eastus2 --template-file bootstrap/main.bicep --parameters bootstrap/main.bicepparam"

@@ -1,0 +1,5 @@
+# Compiled Bicep output (az bicep build)
+*.json
+
+# Local env
+.env
