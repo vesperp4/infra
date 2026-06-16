@@ -31,11 +31,11 @@ runnerIp="$(curl -fsS https://api.ipify.org)"
 ruleName="ci-onboard-$(date +%s)"
 cleanup() {
   az postgres flexible-server firewall-rule delete \
-    -g "$rg" -n "$server" --rule-name "$ruleName" --yes >/dev/null 2>&1 || true
+    -g "$rg" --server-name "$server" --name "$ruleName" --yes >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
 az postgres flexible-server firewall-rule create \
-  -g "$rg" -n "$server" --rule-name "$ruleName" \
+  -g "$rg" --server-name "$server" --name "$ruleName" \
   --start-ip-address "$runnerIp" --end-ip-address "$runnerIp" >/dev/null
 
 # Entra access token for PostgreSQL, used as the connection password.
