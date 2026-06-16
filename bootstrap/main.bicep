@@ -50,7 +50,7 @@ var roles = {
   acrPull: '7f951dda-4ed3-4680-a7ca-43fe172d538d'
   contributor: 'b24988ac-6180-42a0-ab88-20f7382dd24c'
   kvSecretsUser: '4633458b-17de-408a-b874-0445c86b69e6'
-  kvSecretsOfficer: 'b86a8fe4-44ce-4948-aa89-86bc5fd35d39'
+  kvSecretsOfficer: 'b86a8fe4-44ce-4948-aee5-eccb2c155cd7'
 }
 
 // ---------- Resource groups ----------
