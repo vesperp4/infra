@@ -19,6 +19,9 @@ resource kv 'Microsoft.KeyVault/vaults@2023-07-01' = {
     // RBAC data-plane authorization (no access policies); access is granted via
     // Key Vault Secrets User/Officer role assignments.
     enableRbacAuthorization: true
+    // Lets the per-env app deployment read the Postgres password via
+    // az.getSecret() in its .bicepparam at deploy time.
+    enabledForTemplateDeployment: true
     enableSoftDelete: true
     softDeleteRetentionInDays: 90
     enablePurgeProtection: true

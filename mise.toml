@@ -5,7 +5,15 @@ gh = "latest"
 
 [tasks.lint]
 description = "Compile/lint all Bicep (no deploy)"
-run = "az bicep build --file bootstrap/main.bicep --stdout > /dev/null && echo 'bootstrap OK'"
+run = """
+az bicep build --file bootstrap/main.bicep --stdout > /dev/null && echo 'bootstrap OK'
+az bicep build --file bicep/platform.bicep --stdout > /dev/null && echo 'platform OK'
+az bicep build --file bicep/app.bicep --stdout > /dev/null && echo 'app OK'
+az bicep build-params --file env/dev/platform.bicepparam --stdout > /dev/null && echo 'dev/platform params OK'
+az bicep build-params --file env/prod/platform.bicepparam --stdout > /dev/null && echo 'prod/platform params OK'
+az bicep build-params --file env/dev/vesperp4-api.bicepparam --stdout > /dev/null && echo 'dev/api params OK'
+az bicep build-params --file env/prod/vesperp4-api.bicepparam --stdout > /dev/null && echo 'prod/api params OK'
+"""
 
 [tasks.bootstrap-whatif]
 description = "Preview the bootstrap deployment (requires az login as an admin)"

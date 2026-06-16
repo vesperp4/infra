@@ -1,0 +1,88 @@
+name: Deploy Platform
+
+# Deploys the per-environment shared platform (PostgreSQL server + Container Apps
+# environment). Runs on changes to the platform Bicep/params, or on demand. Prod
+# is gated by the `production` environment's required reviewers.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'bicep/platform.bicep'
+      - 'bicep/modules/postgres.bicep'
+      - 'bicep/modules/containerapps-env.bicep'
+      - 'env/*/platform.bicepparam'
+      - '.github/workflows/deploy-platform.yaml'
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-platform-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write # Azure OIDC login
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      dev: ${{ steps.filter.outputs.dev }}
+      prod: ${{ steps.filter.outputs.prod }}
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4.0.1
+        id: filter
+        with:
+          filters: |
+            dev:
+              - 'bicep/platform.bicep'
+              - 'bicep/modules/postgres.bicep'
+              - 'bicep/modules/containerapps-env.bicep'
+              - '.github/workflows/deploy-platform.yaml'
+              - 'env/dev/platform.bicepparam'
+            prod:
+              - 'bicep/platform.bicep'
+              - 'bicep/modules/postgres.bicep'
+              - 'bicep/modules/containerapps-env.bicep'
+              - '.github/workflows/deploy-platform.yaml'
+              - 'env/prod/platform.bicepparam'
+
+  dev:
+    needs: changes
+    if: ${{ needs.changes.outputs.dev == 'true' || github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    environment: dev
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - name: Azure login (OIDC)
+        uses: azure/login@532459ea530d8321f2fb9bb10d1e0bcf23869a43 # v3.0.0
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - name: Deploy platform (dev)
+        run: |
+          az deployment group create \
+            --resource-group vesperp4-dev-rg \
+            --name platform-${{ github.run_id }} \
+            --parameters env/dev/platform.bicepparam
+
+  prod:
+    needs: changes
+    if: ${{ needs.changes.outputs.prod == 'true' || github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    environment: production # required-reviewer approval gate
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - name: Azure login (OIDC)
+        uses: azure/login@532459ea530d8321f2fb9bb10d1e0bcf23869a43 # v3.0.0
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - name: Deploy platform (prod)
+        run: |
+          az deployment group create \
+            --resource-group vesperp4-prod-rg \
+            --name platform-${{ github.run_id }} \
+            --parameters env/prod/platform.bicepparam
