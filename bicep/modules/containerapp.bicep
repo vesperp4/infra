@@ -36,6 +36,12 @@ param maxReplicas int = 1
 param cpu string = '0.5'
 param memory string = '1Gi'
 
+@description('Azure Communication Services data-plane origin (empty disables ACS; app falls back to log-only email)')
+param acsEndpoint string = ''
+
+@description('Verified ACS sender address, e.g. DoNotReply@<guid>.azurecomm.net')
+param acsSenderAddress string = ''
+
 resource app 'Microsoft.App/containerApps@2024-03-01' = {
   name: name
   location: location
@@ -74,14 +80,19 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
           }
           // Passwordless: the app obtains an Entra token via its managed identity
           // (AZURE_CLIENT_ID) and uses it as the Postgres password. No secret here.
-          env: [
+          // The same identity mints an ACS token for sending email, so ACS needs
+          // only its endpoint + sender — no key. Empty endpoint => log-only email.
+          env: concat([
             { name: 'PGHOST', value: pgHost }
             { name: 'PGUSER', value: pgUser }
             { name: 'PGDATABASE', value: pgDatabase }
             { name: 'PGPORT', value: '5432' }
             { name: 'PGSSLMODE', value: 'require' }
             { name: 'AZURE_CLIENT_ID', value: appIdentityClientId }
-          ]
+          ], empty(acsEndpoint) ? [] : [
+            { name: 'ACS_ENDPOINT', value: acsEndpoint }
+            { name: 'ACS_SENDER_ADDRESS', value: acsSenderAddress }
+          ])
           probes: [
             {
               type: 'Liveness'
