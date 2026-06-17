@@ -111,5 +111,5 @@ runner's IP (GitHub runners aren't covered by `AllowAzureServices`), removed on 
 ## Related
 
 - Identity/foundation rationale: [`bootstrap/README.md`](./bootstrap/README.md)
-- Human identity & access (groups, break-glass): monorepo `iac/azure/entra/`
+- Human identity & access (groups, break-glass): monorepo `docs/entra-identity.md`
 - Pipeline overview: monorepo `docs/cicd-pipeline.md` and `docs/infra-repo-spec.md`
