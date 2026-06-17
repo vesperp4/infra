@@ -10,7 +10,7 @@
 #
 # Requires: az (already logged in as the deploy identity), psql.
 #
-# Usage: onboard-app-db.sh <rg> <server> <db> <app-identity-name> <shared-rg>
+# Usage: onboard-app-db.sh <rg> <server> <db> <app-identity-name> <shared-rg> <deploy-admin-name>
 set -euo pipefail
 
 rg="${1:?resource group required}"
@@ -18,11 +18,13 @@ server="${2:?server name required}"
 db="${3:?database name required}"
 appRole="${4:?app identity name required}"
 sharedRg="${5:?shared resource group required}"
+# Postgres login for the deploy identity = the principalName it was registered
+# with as the server's Entra admin (its managed-identity name). NOT the appId
+# that `az account show --query user.name` returns for an OIDC login — Flexible
+# Server matches the Entra admin by that registered name.
+adminUser="${6:?deploy admin login name required}"
 
 fqdn="${server}.postgres.database.azure.com"
-
-# The deploy identity's own name is its Postgres admin login.
-adminUser="$(az account show --query user.name -o tsv)"
 # Object ID the Entra token will carry for the app identity.
 appOid="$(az identity show -g "$sharedRg" -n "$appRole" --query principalId -o tsv)"
 

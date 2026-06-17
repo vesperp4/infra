@@ -106,4 +106,5 @@ jobs:
             "${{ steps.deploy.outputs.server }}" \
             "${{ steps.deploy.outputs.db }}" \
             "id-app-${{ matrix.environment }}" \
-            "vesperp4-shared-rg"
+            "vesperp4-shared-rg" \
+            "id-github-deploy-${{ matrix.environment }}"
