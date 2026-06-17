@@ -4,10 +4,9 @@ param environment = 'dev'
 
 param appName = 'portal-web'
 
-// Per-env FQDN scheme: portal = `portal.` prefix on the env baseDomain
-// (dev baseDomain = dev.vesperp4.com). A subdomain, so it binds cleanly via
-// cname-delegation — add a grey-cloud CNAME `portal.dev` → this SWA's
-// defaultHostname in the vesperp4.com Cloudflare zone.
-param customDomains = [
-  { name: 'portal.dev.vesperp4.com' }
-]
+// No custom domain in dev — same as dev mainsite-web; dev testing uses the
+// *.azurestaticapps.net defaultHostname. (cname-delegation can't validate a
+// binding until the CNAME exists, and the CNAME can't point anywhere until this
+// SWA exists — so a greenfield SWA is created bare. If a dev FQDN is wanted
+// later, add a grey-cloud CNAME `portal.dev` → this SWA's defaultHostname, then
+// re-introduce `customDomains` here.)
