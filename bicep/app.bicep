@@ -10,14 +10,17 @@ targetScope = 'resourceGroup'
 @allowed(['dev', 'prod'])
 param environment string
 
-@description('App/image name (matches env/<env>/<appName>.bicepparam and the ACR repo)')
-param appName string = 'vesperp4-api'
+@description('App/image name (matches apps/<env>/<appGroup>/<appName>.bicepparam and the ACR repo)')
+param appName string = 'mainsite-api'
+
+@description('App group — the site this component belongs to; names the shared DB server')
+param appGroup string = 'mainsite'
 
 @description('Image tag to deploy — bumped by the monorepo release pipeline')
 param imageTag string
 
 @description('Database name on the app server')
-param databaseName string = 'vesperp4_api'
+param databaseName string = 'mainsite'
 
 param location string = resourceGroup().location
 
@@ -56,7 +59,7 @@ var caeName = 'vesperp4-${environment}-cae'
 // DB region is part of the server name: self-documenting, and collision-proof
 // when the DB region differs from compute (Azure caches a name->region mapping
 // in the RG, so a failed create in one region blocks recreating it in another).
-var pgName = '${appName}-${environment}-${postgresLocation}-pg'
+var pgName = '${appGroup}-${environment}-${postgresLocation}-db'
 var containerAppName = '${appName}-${environment}'
 
 // ---------- Shared resources (bootstrap + platform.bicep) ----------
@@ -85,7 +88,7 @@ resource cae 'Microsoft.App/managedEnvironments@2024-03-01' existing = {
 // ---------- This app's dedicated PostgreSQL server + database ----------
 
 module postgres 'modules/postgres.bicep' = {
-  name: '${appName}-postgres'
+  name: '${appGroup}-postgres'
   params: {
     name: pgName
     location: postgresLocation
