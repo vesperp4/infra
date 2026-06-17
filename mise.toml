@@ -3,17 +3,44 @@
 azure = "latest"
 gh = "latest"
 
+# CI quality tooling — lint workflows and shell scripts locally.
+actionlint = "latest"
+shellcheck = "latest"
+
+# ===========================================================================
+# `mise run` is the front door. Run `mise tasks` to see everything.
+# Before pushing: `mise run check`. Deploys run in CI; the bootstrap-* tasks
+# below are the only ones a human runs by hand (admin az login required).
+# ===========================================================================
+
+# --- Quality gates: run `mise run check` before pushing --------------------
+
 [tasks.lint]
-description = "Compile/lint all Bicep (no deploy)"
+description = "Compile every Bicep template + param file (no deploy)"
+shell = "bash -c"
 run = """
-az bicep build --file bootstrap/main.bicep --stdout > /dev/null && echo 'bootstrap OK'
-az bicep build --file bicep/platform.bicep --stdout > /dev/null && echo 'platform OK'
-az bicep build --file bicep/app.bicep --stdout > /dev/null && echo 'app OK'
-az bicep build-params --file platform/dev.bicepparam --stdout > /dev/null && echo 'dev/platform params OK'
-az bicep build-params --file platform/prod.bicepparam --stdout > /dev/null && echo 'prod/platform params OK'
-az bicep build-params --file apps/dev/mainsite/mainsite-api.bicepparam --stdout > /dev/null && echo 'dev/api params OK'
-az bicep build-params --file apps/prod/mainsite/mainsite-api.bicepparam --stdout > /dev/null && echo 'prod/api params OK'
+set -euo pipefail
+for f in bootstrap/main.bicep bicep/*.bicep; do
+  az bicep build --file "$f" --stdout > /dev/null && echo "OK  $f"
+done
+for f in bootstrap/main.bicepparam platform/*.bicepparam apps/*/*/*.bicepparam; do
+  az bicep build-params --file "$f" --stdout > /dev/null && echo "OK  $f"
+done
 """
+
+[tasks.lint-workflows]
+description = "Lint GitHub Actions workflows with actionlint"
+run = "actionlint"
+
+[tasks.lint-scripts]
+description = "Lint shell scripts with shellcheck"
+run = "shellcheck scripts/*.sh"
+
+[tasks.check]
+description = "Run all local gates (bicep + workflows + scripts). Run before pushing."
+depends = ["lint", "lint-workflows", "lint-scripts"]
+
+# --- Bootstrap (admin, run by hand) ----------------------------------------
 
 [tasks.bootstrap-whatif]
 description = "Preview the bootstrap deployment (requires az login as an admin)"
