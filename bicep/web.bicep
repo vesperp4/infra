@@ -22,6 +22,9 @@ param location string = 'eastus2'
 @allowed(['Free', 'Standard'])
 param sku string = 'Free'
 
+@description('Subdomain custom domains to bind (e.g. www). See staticwebapp.bicep; apex is bound out-of-band.')
+param customDomains array = []
+
 var swaName = '${appName}-${environment}'
 
 module web 'modules/staticwebapp.bicep' = {
@@ -30,6 +33,7 @@ module web 'modules/staticwebapp.bicep' = {
     name: swaName
     location: location
     sku: sku
+    customDomains: customDomains
   }
 }
 
