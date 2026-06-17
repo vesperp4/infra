@@ -106,6 +106,20 @@ module postgres 'modules/postgres.bicep' = {
   }
 }
 
+// ---------- Transactional email (Azure Communication Services) ----------
+
+module acsEmail 'modules/acs-email.bicep' = {
+  name: '${appGroup}-acs-email'
+  params: {
+    namePrefix: '${appGroup}-${environment}'
+    senderPrincipalId: appIdentity.properties.principalId
+    // Send-access role is granted out-of-band — the CI deploy identity is only
+    // RG Contributor and can't write role assignments. See README for the
+    // `az role assignment create` (scope = acsResourceId output).
+    grantSenderRole: false
+  }
+}
+
 // ---------- The Container App ----------
 
 module app 'modules/containerapp.bicep' = {
@@ -124,6 +138,9 @@ module app 'modules/containerapp.bicep' = {
     pgDatabase: postgres.outputs.databaseName
     minReplicas: minReplicas
     maxReplicas: maxReplicas
+    // Passwordless ACS email — endpoint + verified sender from the module above.
+    acsEndpoint: acsEmail.outputs.endpoint
+    acsSenderAddress: acsEmail.outputs.senderAddress
   }
 }
 
@@ -132,3 +149,9 @@ output containerAppName string = app.outputs.name
 output postgresFqdn string = postgres.outputs.fqdn
 output postgresServerName string = postgres.outputs.name
 output databaseName string = postgres.outputs.databaseName
+output acsEndpoint string = acsEmail.outputs.endpoint
+output acsSenderAddress string = acsEmail.outputs.senderAddress
+// Out-of-band send-access grant (deploy identity can't write role assignments):
+//   az role assignment create --assignee <appIdentity clientId> \
+//     --role Contributor --scope <acsResourceId>
+output acsResourceId string = acsEmail.outputs.acsResourceId
