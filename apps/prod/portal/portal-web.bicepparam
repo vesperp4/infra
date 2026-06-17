@@ -4,11 +4,13 @@ param environment = 'prod'
 
 param appName = 'portal-web'
 
-// Per-env FQDN scheme: portal = `portal.` prefix on the env baseDomain
-// (prod baseDomain = vesperp4.com). A subdomain, so it binds cleanly via
-// cname-delegation — add a grey-cloud CNAME `portal` → this SWA's
-// defaultHostname in the vesperp4.com Cloudflare zone. (Unlike the mainsite
-// apex, no dns-txt-token dance is needed for a subdomain.)
-param customDomains = [
-  { name: 'portal.vesperp4.com' }
-]
+// Custom domain is bound in a PHASE 2, not on first create: cname-delegation
+// validates against an existing CNAME → this SWA's defaultHostname, but neither
+// exists yet for a greenfield SWA. Bootstrap order:
+//   1. deploy bare (this) → SWA created, note its defaultHostname
+//   2. add a grey-cloud CNAME `portal` → that defaultHostname in the
+//      vesperp4.com Cloudflare zone (subdomain, so no apex dns-txt-token dance)
+//   3. re-add `customDomains = [ { name: 'portal.vesperp4.com' } ]` here → the
+//      next deploy validates and binds it idempotently
+// (mainsite-web's `www` bound on first deploy only because its CNAME pre-existed
+// from the prior site.)
