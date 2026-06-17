@@ -6,6 +6,11 @@ Infrastructure-as-Code for Vesper P4 on **Azure**: containerized backends on
 each environment and is deployed via GitHub Actions using **OIDC workload
 identity federation** (no stored secrets).
 
+> **New to cloud / Infrastructure-as-Code?** Start with the
+> [**Onboarding guide**](./docs/onboarding.md) — it explains Azure, Bicep, and how this repo
+> works from scratch, and how to make changes safely. Unfamiliar terms are in the
+> [Glossary](./docs/glossary.md).
+
 ## Layout
 
 ```
