@@ -128,6 +128,17 @@ jobs:
             echo "api=$(out apiUrl)"
             echo "appName=$(out containerAppName)"
           } >> "$GITHUB_OUTPUT"
+      # The GitHub OIDC assertion the job logged in with lives only ~5 minutes.
+      # A greenfield Postgres Flexible Server create takes ~8 minutes, so by the
+      # time onboarding runs the assertion has expired and the script's az token
+      # request fails (AADSTS700024). Re-login here to mint a fresh assertion.
+      - name: Re-auth before onboarding (fresh OIDC token)
+        if: ${{ steps.deploy.outputs.server != '' }}
+        uses: azure/login@532459ea530d8321f2fb9bb10d1e0bcf23869a43 # v3.0.0
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
       - name: Onboard DB role
         if: ${{ steps.deploy.outputs.server != '' }}
         run: |
