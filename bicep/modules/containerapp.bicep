@@ -42,6 +42,12 @@ param acsEndpoint string = ''
 @description('Verified ACS sender address, e.g. DoNotReply@<guid>.azurecomm.net')
 param acsSenderAddress string = ''
 
+@description('Origin the verification link points at — the portal web app hosting /confirm (empty => app default, prod portal)')
+param publicBaseUrl string = ''
+
+@description('Comma-separated browser origins allowed to call the API (empty => app default, the portal origin)')
+param corsAllowedOrigins string = ''
+
 resource app 'Microsoft.App/containerApps@2024-03-01' = {
   name: name
   location: location
@@ -92,6 +98,10 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
           ], empty(acsEndpoint) ? [] : [
             { name: 'ACS_ENDPOINT', value: acsEndpoint }
             { name: 'ACS_SENDER_ADDRESS', value: acsSenderAddress }
+          ], empty(publicBaseUrl) ? [] : [
+            { name: 'PUBLIC_BASE_URL', value: publicBaseUrl }
+          ], empty(corsAllowedOrigins) ? [] : [
+            { name: 'CORS_ALLOWED_ORIGINS', value: corsAllowedOrigins }
           ])
           probes: [
             {

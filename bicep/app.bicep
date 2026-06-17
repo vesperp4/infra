@@ -55,6 +55,15 @@ param postgresStorageSizeGB int = 32
 param minReplicas int = (environment == 'prod') ? 1 : 0
 param maxReplicas int = (environment == 'prod') ? 3 : 1
 
+// Public domain layout is deterministic: prod lives at the apex, dev under the
+// `dev.` subdomain. The portal web app hosts the /confirm page, so the
+// verification link (PUBLIC_BASE_URL) points there. The mainsite (join form)
+// and portal (confirm page) origins both call this API from the browser, so
+// both are CORS-allowed. Bound out-of-band as SWA custom domains (see README).
+var rootDomain = (environment == 'prod') ? 'vesperp4.com' : 'dev.vesperp4.com'
+var portalOrigin = 'https://portal.${rootDomain}'
+var mainsiteOrigin = 'https://${rootDomain}'
+
 var caeName = 'vesperp4-${environment}-cae'
 // DB region is part of the server name: self-documenting, and collision-proof
 // when the DB region differs from compute (Azure caches a name->region mapping
@@ -141,6 +150,10 @@ module app 'modules/containerapp.bicep' = {
     // Passwordless ACS email — endpoint + verified sender from the module above.
     acsEndpoint: acsEmail.outputs.endpoint
     acsSenderAddress: acsEmail.outputs.senderAddress
+    // Verification links point at this env's portal; the join form + confirm
+    // page origins are CORS-allowed so the SWA→API browser calls work.
+    publicBaseUrl: portalOrigin
+    corsAllowedOrigins: '${mainsiteOrigin},${portalOrigin}'
   }
 }
 
