@@ -139,8 +139,9 @@ infra/
 ├── platform/           PARAMETERS for the platform, one per env (dev/prod).
 │
 ├── apps/               Layer 3 — PARAMETERS for each app, grouped by env.
-│   ├── dev/mainsite/   mainsite-api.bicepparam, mainsite-web.bicepparam
-│   └── prod/mainsite/  same, for production
+│   ├── dev/mainsite/   mainsite-web.bicepparam
+│   ├── dev/portal/     portal-api.bicepparam, portal-web.bicepparam
+│   └── prod/...        same groups, for production
 │
 ├── scripts/
 │   └── onboard-app-db.sh   Grants the app permission to use its database (run by CI).
@@ -164,7 +165,7 @@ version of the backend:
 The website repo builds a new api image and pushes it to the registry
                           │
                           ▼
-It opens a PR HERE that bumps the imageTag in apps/dev/mainsite/mainsite-api.bicepparam
+It opens a PR HERE that bumps the imageTag in apps/dev/portal/portal-api.bicepparam
                           │
                   (review + merge)
                           ▼
