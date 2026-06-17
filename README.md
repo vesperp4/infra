@@ -21,8 +21,8 @@ infra/
 │   └── modules/          postgres, containerapps-env, containerapp
 ├── platform/            <env>.bicepparam — shared platform params per env
 ├── apps/
-│   ├── dev/             <app>.bicepparam — one per app (pinned imageTag)
-│   └── prod/            <app>.bicepparam — one per app (pinned imageTag)
+│   ├── dev/             <app-group>/<component>.bicepparam (pinned imageTag)
+│   └── prod/            <app-group>/<component>.bicepparam (pinned imageTag)
 ├── scripts/
 │   └── onboard-app-db.sh  Idempotent passwordless DB-role grant (run by CI)
 └── .github/workflows/
@@ -32,11 +32,11 @@ infra/
 
 ## Adding a new app
 
-Drop a `apps/dev/<app>.bicepparam` and `apps/prod/<app>.bicepparam` (using
-`../../bicep/app.bicep`, with `param appName`, `imageTag`, and the Key Vault
-`postgresAdminPassword`). `deploy-app.yaml` discovers it by convention, deploys
-its stack, and onboards its DB role — no workflow edits. Also seed its
-`<app>-pg-admin-password` secret in the env Key Vault.
+Drop a `apps/dev/<app-group>/<component>.bicepparam` and its prod counterpart
+(using `../../../bicep/app.bicep`, with `param appName`, `appGroup`, `imageTag`,
+and the Key Vault `postgresAdminPassword`). `deploy-app.yaml` discovers it by
+convention, deploys its stack, and onboards its DB role — no workflow edits. Also
+seed its `<app-group>-pg-admin-password` secret in the env Key Vault.
 
 ## Shared platform vs per-app
 
@@ -47,7 +47,7 @@ The Container Apps environment is **shared per environment**; PostgreSQL is
   compute substrate) once per env. It rarely changes.
 - `bicep/app.bicep` deploys **one app**: its **own** PostgreSQL Flexible Server +
   database, plus its Container App. Adding a second app = a new
-  `apps/<env>/<app>.bicepparam` (its own server name, database, and Key Vault
+  `apps/<env>/<app-group>/<component>.bicepparam` (its own server name, database, and Key Vault
   password secret). Apps never share a database server.
 
 ## Order of operations
@@ -55,9 +55,9 @@ The Container Apps environment is **shared per environment**; PostgreSQL is
 1. **Bootstrap** the identity/foundation once (admin-run) — `bootstrap/README.md`.
 2. **Wire GitHub** environments + secrets/variables from the bootstrap outputs.
 3. **Seed** each app's Postgres password secret into the env Key Vault — secret
-   name `<app>-pg-admin-password` (e.g. `vesperp4-api-pg-admin-password`).
+   name `<app-group>-pg-admin-password` (e.g. `mainsite-pg-admin-password`).
 4. **Deploy the platform** per env (`deploy-platform.yaml`, or `mise`/`az` locally).
-5. **Deploy apps** — the monorepo bumps `apps/<env>/<app>.bicepparam` and merging
+5. **Deploy apps** — the monorepo bumps `apps/<env>/<app-group>/<component>.bicepparam` and merging
    triggers `deploy-app.yaml`, which deploys the stack and **onboards the DB role
    automatically** (no manual SQL).
 
@@ -65,7 +65,7 @@ The Container Apps environment is **shared per environment**; PostgreSQL is
 
 Each app's server is created with **Entra auth enabled** and the `infra-admins`
 group as the Entra administrator. Password auth is left **enabled as an escape
-hatch** (the `pgadmin` password lives in Key Vault as `<app>-pg-admin-password`);
+hatch** (the `pgadmin` password lives in Key Vault as `<app-group>-pg-admin-password`);
 flip `passwordAuth: 'Disabled'` in `modules/postgres.bicep` to harden once the app
 is on tokens.
 

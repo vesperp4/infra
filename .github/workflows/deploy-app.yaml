@@ -1,9 +1,10 @@
 name: Deploy App
 
 # Deploys application stacks (each = its own Postgres server + database +
-# Container App) onto the shared platform. Generic over apps: a new app is just
-# a new apps/<env>/<app>.bicepparam file — this workflow discovers it, deploys
-# it, and onboards its passwordless DB role automatically. Prod is gated by the
+# Container App) onto the shared platform. Generic over apps: a new component is
+# just a new apps/<env>/<app-group>/<component>.bicepparam file — this workflow
+# discovers it, deploys it, and onboards its passwordless DB role automatically.
+# Prod is gated by the
 # `prod` environment's required reviewers.
 on:
   push:
@@ -47,20 +48,22 @@ jobs:
           if [ "$EVENT" = "workflow_dispatch" ] || [ -z "${BEFORE:-}" ] \
              || [ "$BEFORE" = "0000000000000000000000000000000000000000" ] \
              || ! git rev-parse --verify "${BEFORE}^{commit}" >/dev/null 2>&1; then
-            files="$(git ls-files 'apps/*/*.bicepparam')"
+            files="$(git ls-files 'apps/*/*/*.bicepparam')"
           else
             changed="$(git diff --name-only "$BEFORE" "${{ github.sha }}")"
             if echo "$changed" | grep -qE "$shared_re"; then
-              files="$(git ls-files 'apps/*/*.bicepparam')"
+              files="$(git ls-files 'apps/*/*/*.bicepparam')"
             else
-              files="$(echo "$changed" | grep -E '^apps/[^/]+/[^/]+\.bicepparam$' || true)"
+              files="$(echo "$changed" | grep -E '^apps/[^/]+/[^/]+/[^/]+\.bicepparam$' || true)"
             fi
           fi
           matrix='[]'
+          # Param path layout: apps/<env>/<app-group>/<component>.bicepparam
           for f in $files; do
             env="$(echo "$f" | cut -d/ -f2)"
+            group="$(echo "$f" | cut -d/ -f3)"
             app="$(basename "$f" .bicepparam)"
-            matrix="$(echo "$matrix" | jq -c --arg a "$app" --arg e "$env" '. + [{"app":$a,"environment":$e}]')"
+            matrix="$(echo "$matrix" | jq -c --arg a "$app" --arg g "$group" --arg e "$env" '. + [{"app":$a,"appGroup":$g,"environment":$e}]')"
           done
           {
             echo "matrix=$(echo "$matrix" | jq -c '{include: .}')"
@@ -92,7 +95,7 @@ jobs:
           az deployment group create \
             --resource-group "$rg" \
             --name "$name" \
-            --parameters "apps/${{ matrix.environment }}/${{ matrix.app }}.bicepparam"
+            --parameters "apps/${{ matrix.environment }}/${{ matrix.appGroup }}/${{ matrix.app }}.bicepparam"
           server="$(az deployment group show -g "$rg" -n "$name" --query properties.outputs.postgresServerName.value -o tsv)"
           db="$(az deployment group show -g "$rg" -n "$name" --query properties.outputs.databaseName.value -o tsv)"
           {
