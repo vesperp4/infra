@@ -128,6 +128,7 @@ module app 'modules/containerapp.bicep' = {
 }
 
 output apiUrl string = 'https://${app.outputs.fqdn}'
+output containerAppName string = app.outputs.name
 output postgresFqdn string = postgres.outputs.fqdn
 output postgresServerName string = postgres.outputs.name
 output databaseName string = postgres.outputs.databaseName

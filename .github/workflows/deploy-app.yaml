@@ -89,6 +89,25 @@ jobs:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - name: What-if (preview + destructive guard)
+        run: |
+          set -euo pipefail
+          rg="vesperp4-${{ matrix.environment }}-rg"
+          params="apps/${{ matrix.environment }}/${{ matrix.appGroup }}/${{ matrix.app }}.bicepparam"
+          json="$(az deployment group what-if -g "$rg" --parameters "$params" --no-pretty-print)"
+          {
+            echo "### what-if — ${{ matrix.app }} (${{ matrix.environment }})"
+            echo '```'
+            echo "$json" | jq -r '.changes[] | "\(.changeType)  \(.resourceId | sub(".*/providers/"; ""))"' | sort
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          # An app deploy should never delete a resource. If what-if predicts one,
+          # stop and let a human investigate rather than silently destroying state.
+          dels="$(echo "$json" | jq '[.changes[] | select(.changeType == "Delete")] | length')"
+          if [ "$dels" -gt 0 ]; then
+            echo "::error::what-if predicts $dels resource deletion(s) — refusing to deploy. See the step summary."
+            exit 1
+          fi
       - name: Deploy ${{ matrix.app }} (${{ matrix.environment }})
         id: deploy
         run: |
@@ -98,13 +117,16 @@ jobs:
             --resource-group "$rg" \
             --name "$name" \
             --parameters "apps/${{ matrix.environment }}/${{ matrix.appGroup }}/${{ matrix.app }}.bicepparam"
+          out() { az deployment group show -g "$rg" -n "$name" --query "properties.outputs.$1.value" -o tsv 2>/dev/null || true; }
           # Web components (Static Web Apps) emit no Postgres outputs — an empty
-          # server signals the Onboard DB role step to skip.
-          server="$(az deployment group show -g "$rg" -n "$name" --query properties.outputs.postgresServerName.value -o tsv 2>/dev/null || true)"
-          db="$(az deployment group show -g "$rg" -n "$name" --query properties.outputs.databaseName.value -o tsv 2>/dev/null || true)"
+          # server signals the Onboard DB role step to skip. The web/api host
+          # outputs feed the Smoke test step.
           {
-            echo "server=$server"
-            echo "db=$db"
+            echo "server=$(out postgresServerName)"
+            echo "db=$(out databaseName)"
+            echo "web=$(out defaultHostname)"
+            echo "api=$(out apiUrl)"
+            echo "appName=$(out containerAppName)"
           } >> "$GITHUB_OUTPUT"
       - name: Onboard DB role
         if: ${{ steps.deploy.outputs.server != '' }}
@@ -116,3 +138,37 @@ jobs:
             "id-app-${{ matrix.environment }}" \
             "vesperp4-shared-rg" \
             "id-github-deploy-${{ matrix.environment }}"
+      - name: Smoke test
+        if: ${{ steps.deploy.outcome == 'success' }}
+        env:
+          WEB: ${{ steps.deploy.outputs.web }}
+          API: ${{ steps.deploy.outputs.api }}
+          APP_NAME: ${{ steps.deploy.outputs.appName }}
+          RG: vesperp4-${{ matrix.environment }}-rg
+        run: |
+          set -euo pipefail
+          # Web (Static Web App): the default host must serve 200. Custom domains
+          # are validated out-of-band, so we probe the default host only.
+          if [ -n "$WEB" ]; then
+            for i in $(seq 1 10); do
+              code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "https://$WEB/" || true)"
+              if [ "$code" = "200" ]; then echo "web OK — https://$WEB ($code)"; break; fi
+              echo "web try $i/10: $code"; sleep 6
+              if [ "$i" = "10" ]; then echo "::error::web https://$WEB never returned 200"; exit 1; fi
+            done
+          fi
+          # API (Container App): assert INFRA health — the revision provisioned and
+          # the image pulled. The app's own /health is reported but NOT gated: the
+          # service intentionally crash-loops on DATABASE_URL until the dev team
+          # wires passwordless auth, so failing on it here would be a false alarm.
+          if [ -n "$API" ]; then
+            state="$(az containerapp show -g "$RG" -n "$APP_NAME" --query properties.provisioningState -o tsv)"
+            echo "container app $APP_NAME provisioningState=$state"
+            if [ "$state" != "Succeeded" ]; then
+              echo "::error::container app $APP_NAME not provisioned (state=$state)"; exit 1
+            fi
+            running="$(az containerapp revision list -g "$RG" -n "$APP_NAME" --query "[?properties.active].properties.runningState | [0]" -o tsv 2>/dev/null || true)"
+            echo "active revision runningState=$running"
+            code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "$API/health" || true)"
+            echo "::notice::$API/health -> $code (informational until passwordless DB auth is wired)"
+          fi
