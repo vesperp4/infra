@@ -11,8 +11,10 @@ on:
     branches: [main]
     paths:
       - 'bicep/app.bicep'
+      - 'bicep/web.bicep'
       - 'bicep/modules/containerapp.bicep'
       - 'bicep/modules/postgres.bicep'
+      - 'bicep/modules/staticwebapp.bicep'
       - 'apps/**/*.bicepparam'
       - 'scripts/onboard-app-db.sh'
       - '.github/workflows/deploy-app.yaml'
@@ -44,7 +46,7 @@ jobs:
           set -euo pipefail
           # A change to the shared app template/modules/script redeploys every app;
           # otherwise only the app param files that changed in this push.
-          shared_re='^(bicep/app\.bicep|bicep/modules/(containerapp|postgres)\.bicep|scripts/onboard-app-db\.sh|\.github/workflows/deploy-app\.yaml)$'
+          shared_re='^(bicep/(app|web)\.bicep|bicep/modules/(containerapp|postgres|staticwebapp)\.bicep|scripts/onboard-app-db\.sh|\.github/workflows/deploy-app\.yaml)$'
           if [ "$EVENT" = "workflow_dispatch" ] || [ -z "${BEFORE:-}" ] \
              || [ "$BEFORE" = "0000000000000000000000000000000000000000" ] \
              || ! git rev-parse --verify "${BEFORE}^{commit}" >/dev/null 2>&1; then
@@ -96,13 +98,16 @@ jobs:
             --resource-group "$rg" \
             --name "$name" \
             --parameters "apps/${{ matrix.environment }}/${{ matrix.appGroup }}/${{ matrix.app }}.bicepparam"
-          server="$(az deployment group show -g "$rg" -n "$name" --query properties.outputs.postgresServerName.value -o tsv)"
-          db="$(az deployment group show -g "$rg" -n "$name" --query properties.outputs.databaseName.value -o tsv)"
+          # Web components (Static Web Apps) emit no Postgres outputs — an empty
+          # server signals the Onboard DB role step to skip.
+          server="$(az deployment group show -g "$rg" -n "$name" --query properties.outputs.postgresServerName.value -o tsv 2>/dev/null || true)"
+          db="$(az deployment group show -g "$rg" -n "$name" --query properties.outputs.databaseName.value -o tsv 2>/dev/null || true)"
           {
             echo "server=$server"
             echo "db=$db"
           } >> "$GITHUB_OUTPUT"
       - name: Onboard DB role
+        if: ${{ steps.deploy.outputs.server != '' }}
         run: |
           bash scripts/onboard-app-db.sh \
             "vesperp4-${{ matrix.environment }}-rg" \
