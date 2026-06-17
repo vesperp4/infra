@@ -108,7 +108,7 @@ az keyvault secret set --vault-name vesperp4-prod-kv --name postgres-admin-passw
 
 - **monorepo (`vesperp4/mono`)**: environment **`azure-acr`** (no gate needed).
   Add `environment: azure-acr` to the `build-and-push` job in
-  `.github/workflows/mainsite-api-build.yaml` so its OIDC subject matches.
+  `.github/workflows/portal-api-build.yaml` so its OIDC subject matches.
 - **infra repo (`vesperp4/infra`)**: environments **`dev`** (no gate) and
   **`prod`** (required reviewers).
 

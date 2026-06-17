@@ -11,16 +11,16 @@ targetScope = 'resourceGroup'
 param environment string
 
 @description('App/image name (matches apps/<env>/<appGroup>/<appName>.bicepparam and the ACR repo)')
-param appName string = 'mainsite-api'
+param appName string = 'portal-api'
 
 @description('App group — the site this component belongs to; names the shared DB server')
-param appGroup string = 'mainsite'
+param appGroup string = 'portal'
 
 @description('Image tag to deploy — bumped by the monorepo release pipeline')
 param imageTag string
 
 @description('Database name on the app server')
-param databaseName string = 'mainsite'
+param databaseName string = 'portal'
 
 param location string = resourceGroup().location
 

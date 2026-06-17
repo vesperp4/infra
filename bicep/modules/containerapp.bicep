@@ -20,7 +20,7 @@ param appIdentityResourceId string
 param appIdentityClientId string
 
 @description('Container listen port')
-param targetPort int = 3001
+param targetPort int = 8080
 
 @description('PostgreSQL host (FQDN)')
 param pgHost string
