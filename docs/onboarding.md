@@ -200,18 +200,18 @@ cd infra
 mise trust && mise install      # installs az, bicep, and friends from mise.toml
 ```
 
-Then the one command you'll use most — **lint** (compile every Bicep + param file to check it's
-valid, without touching the cloud):
+**`mise` is the front door** — run `mise tasks` to see everything. The two you'll use most:
 
 ```bash
-mise run lint
+mise run lint     # compile every Bicep + param file (no cloud access needed)
+mise run check    # lint + workflow lint + shell-script lint — run before pushing
 ```
 
-Run that before opening a PR. It catches syntax errors and bad references locally. It does **not**
-deploy anything — it just checks the files make sense.
+Run `mise run check` before opening a PR. It catches syntax errors and bad references locally. It
+does **not** deploy anything — it just checks the files make sense.
 
 > **Do I need an Azure login?** Only to *apply* changes, which you normally won't do by hand.
-> `mise run lint` works with no Azure account at all. If you ever do need to log in to look around,
+> `mise run lint` / `mise run check` work with no Azure account at all. If you ever do need to log in to look around,
 > a maintainer will grant you read access and walk you through `az login` — but **never run
 > `az` commands that create, change, or delete resources** unless a maintainer asks you to.
 
@@ -234,7 +234,7 @@ drop in a new param file and the automation discovers it by convention:
   with no database.
 
 The README's ["Adding a new component"](../README.md#adding-a-new-component) section has the exact
-details. Always `mise run lint` before pushing.
+details. Always `mise run check` before pushing.
 
 ---
 

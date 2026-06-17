@@ -104,7 +104,9 @@ runner's IP (GitHub runners aren't covered by `AllowAzureServices`), removed on 
 ## Conventions
 
 - Region `eastus2`, subscription `1e180171-becb-40cd-a4a0-52351087be66`.
-- Compiled JSON is gitignored. `mise run lint` compiles all Bicep + params locally.
+- Compiled JSON is gitignored. **`mise` is the front door** — run `mise tasks` for the list;
+  `mise run lint` compiles all Bicep + params, and `mise run check` also lints workflows and
+  shell scripts. Run `mise run check` before pushing.
 - Actions are SHA-pinned. Prod deploys are gated by the `prod` GitHub
   environment's required reviewers.
 
