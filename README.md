@@ -1,9 +1,10 @@
 # vesperp4 infra
 
-Infrastructure-as-Code for the Vesper P4 backend on **Azure Container Apps**.
-This repo is the source of truth for what runs in each environment and is
-deployed via GitHub Actions using **OIDC workload identity federation** (no
-stored secrets).
+Infrastructure-as-Code for Vesper P4 on **Azure**: containerized backends on
+**Azure Container Apps** (each with its own PostgreSQL), and frontends on
+**Azure Static Web Apps**. This repo is the source of truth for what runs in
+each environment and is deployed via GitHub Actions using **OIDC workload
+identity federation** (no stored secrets).
 
 ## Layout
 
@@ -16,13 +17,14 @@ infra/
 ├── bicep/
 │   ├── platform.bicep    Per-env SHARED platform: Container Apps environment
 │   │                     (+ Log Analytics). Compute substrate only.
-│   ├── app.bicep         Per-app: its OWN PostgreSQL server + database + the
-│   │                     Container App
-│   └── modules/          postgres, containerapps-env, containerapp
+│   ├── app.bicep         API component: its OWN PostgreSQL server + database +
+│   │                     the Container App
+│   ├── web.bicep         Web component: an Azure Static Web App (no database)
+│   └── modules/          postgres, containerapps-env, containerapp, staticwebapp
 ├── platform/            <env>.bicepparam — shared platform params per env
 ├── apps/
-│   ├── dev/             <app-group>/<component>.bicepparam (pinned imageTag)
-│   └── prod/            <app-group>/<component>.bicepparam (pinned imageTag)
+│   ├── dev/             <app-group>/<component>.bicepparam (api: pinned imageTag)
+│   └── prod/            <app-group>/<component>.bicepparam (web: SWA, no imageTag)
 ├── scripts/
 │   └── onboard-app-db.sh  Idempotent passwordless DB-role grant (run by CI)
 └── .github/workflows/
@@ -30,13 +32,21 @@ infra/
     └── deploy-app.yaml        Discovers + deploys app stacks; onboards DB roles
 ```
 
-## Adding a new app
+## Adding a new component
 
-Drop a `apps/dev/<app-group>/<component>.bicepparam` and its prod counterpart
-(using `../../../bicep/app.bicep`, with `param appName`, `appGroup`, `imageTag`,
-and the Key Vault `postgresAdminPassword`). `deploy-app.yaml` discovers it by
-convention, deploys its stack, and onboards its DB role — no workflow edits. Also
-seed its `<app-group>-pg-admin-password` secret in the env Key Vault.
+Drop a `apps/dev/<app-group>/<component>.bicepparam` and its prod counterpart.
+`deploy-app.yaml` discovers it by convention and deploys its stack — no workflow
+edits. There are two component kinds:
+
+- **API** (`using '../../../bicep/app.bicep'`): set `appName`, `appGroup`,
+  `imageTag`, and the Key Vault `postgresAdminPassword`. The deploy also onboards
+  the DB role. Seed its `<app-group>-pg-admin-password` secret in the env Key Vault.
+- **Web** (`using '../../../bicep/web.bicep'`): set `environment` (and optionally
+  `appName`/`location`). Provisions an Azure **Static Web App** — no PostgreSQL,
+  so `deploy-app.yaml` skips the DB-onboard step (it keys off the absence of a
+  `postgresServerName` output). The SWA is created **unlinked from GitHub**; the
+  monorepo's `mainsite-web-deploy.yaml` builds the site and uploads it via the
+  SWA deploy token (BYO deploy). Custom domains are attached out-of-band (DNS).
 
 ## Shared platform vs per-app
 
