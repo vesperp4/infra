@@ -55,6 +55,19 @@ param postgresStorageSizeGB int = 32
 param minReplicas int = (environment == 'prod') ? 1 : 0
 param maxReplicas int = (environment == 'prod') ? 3 : 1
 
+@description('''Resource ID of the managed certificate for api.portal.<rootDomain>.
+The hostname + certificate are created out-of-band (README: "portal-api custom
+domain + Entra app registration"), then the cert ID is recorded here to pin the
+binding. Empty (the default) keeps existing envs deploying unchanged on the
+default *.azurecontainerapps.io FQDN.''')
+param apiCustomDomainCertificateId string = ''
+
+@description('Entra app registration (client) ID for Microsoft OIDC sign-in — pinned from the runbook; empty leaves OIDC disabled')
+param oidcClientId string = ''
+
+@description('Tenant GUID the API validates OIDC sign-ins against — PUPR\'s tenant, NOT the vesperp4 tenant (see the runbook for discovery)')
+param oidcTenantId string = ''
+
 // Public domain layout is deterministic: prod lives at the apex, dev under the
 // `dev.` subdomain. The portal web app hosts the /confirm page, so the
 // verification link (PUBLIC_BASE_URL) points there. The mainsite (join form)
@@ -63,6 +76,12 @@ param maxReplicas int = (environment == 'prod') ? 3 : 1
 var rootDomain = (environment == 'prod') ? 'vesperp4.com' : 'dev.vesperp4.com'
 var portalOrigin = 'https://portal.${rootDomain}'
 var mainsiteOrigin = 'https://${rootDomain}'
+// The API's custom domain sits under the portal subtree so the session cookie
+// can be same-site with the portal SWA: `.portal.<root>` covers both
+// portal.<root> and api.portal.<root>. Deliberately NOT `.vesperp4.com` — the
+// mainsite and TV origins must never see the portal session cookie.
+var apiDomain = 'api.portal.${rootDomain}'
+var cookieDomain = '.portal.${rootDomain}'
 
 var caeName = 'vesperp4-${environment}-cae'
 // DB region is part of the server name: self-documenting, and collision-proof
@@ -154,10 +173,26 @@ module app 'modules/containerapp.bicep' = {
     // page origins are CORS-allowed so the SWA→API browser calls work.
     publicBaseUrl: portalOrigin
     corsAllowedOrigins: '${mainsiteOrigin},${portalOrigin}'
+    // Custom domain — hostname + managed cert are bound out-of-band (README
+    // runbook); the module only declares the binding once the cert ID is
+    // pinned in this env's .bicepparam, so both are safe to pass always.
+    customDomainName: apiDomain
+    customDomainCertificateId: apiCustomDomainCertificateId
+    // Microsoft OIDC sign-in — passed always for simplicity; the API only
+    // enables OIDC when all of its OIDC vars are set (module guards emission
+    // on oidcClientId). No client secret: federated credential on the app
+    // registration via the same managed identity.
+    oidcClientId: oidcClientId
+    oidcTenantId: oidcTenantId
+    oidcRedirectUri: 'https://${apiDomain}/api/v1/auth/oidc/callback'
+    cookieDomain: cookieDomain
   }
 }
 
-output apiUrl string = 'https://${app.outputs.fqdn}'
+// Prefer the custom domain once its cert is pinned; the default FQDN otherwise.
+output apiUrl string = empty(apiCustomDomainCertificateId)
+  ? 'https://${app.outputs.fqdn}'
+  : 'https://${apiDomain}'
 output containerAppName string = app.outputs.name
 output postgresFqdn string = postgres.outputs.fqdn
 output postgresServerName string = postgres.outputs.name

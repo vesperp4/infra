@@ -48,6 +48,24 @@ param publicBaseUrl string = ''
 @description('Comma-separated browser origins allowed to call the API (empty => app default, the portal origin)')
 param corsAllowedOrigins string = ''
 
+@description('Custom domain to bind on ingress (empty => default *.azurecontainerapps.io FQDN only)')
+param customDomainName string = ''
+
+@description('Resource ID of the managed certificate for customDomainName — created out-of-band per the README runbook, then pinned here')
+param customDomainCertificateId string = ''
+
+@description('Entra app registration (client) ID for Microsoft OIDC sign-in (empty => app leaves OIDC disabled)')
+param oidcClientId string = ''
+
+@description('Tenant GUID the API validates OIDC sign-ins against — the members\' home tenant, not this subscription\'s')
+param oidcTenantId string = ''
+
+@description('OIDC callback URL — must match a web redirect URI on the app registration')
+param oidcRedirectUri string = ''
+
+@description('Domain attribute for the session cookie (empty => host-only cookie)')
+param cookieDomain string = ''
+
 resource app 'Microsoft.App/containerApps@2024-03-01' = {
   name: name
   location: location
@@ -66,6 +84,19 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
         targetPort: targetPort
         transport: 'auto'
         allowInsecure: false
+        // The hostname and its managed certificate are created OUT-OF-BAND
+        // (README runbook: DNS records, `az containerapp hostname add/bind`,
+        // `az containerapp env certificate create`) because managed-cert
+        // issuance is inherently two-phase. Once the cert ID is pinned in
+        // params, declaring the binding here keeps ARM PUT redeploys from
+        // stripping it. Omitted entirely until both values are set.
+        customDomains: (empty(customDomainName) || empty(customDomainCertificateId)) ? null : [
+          {
+            name: customDomainName
+            bindingType: 'SniEnabled'
+            certificateId: customDomainCertificateId
+          }
+        ]
       }
       // Pull via managed identity (AcrPull granted in bootstrap) — no registry secret.
       registries: [
@@ -102,6 +133,16 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
             { name: 'PUBLIC_BASE_URL', value: publicBaseUrl }
           ], empty(corsAllowedOrigins) ? [] : [
             { name: 'CORS_ALLOWED_ORIGINS', value: corsAllowedOrigins }
+          // Microsoft OIDC sign-in — no client secret anywhere: the client
+          // credential is a federated identity credential on the app
+          // registration, exchanged at runtime via the same managed identity
+          // (AZURE_CLIENT_ID). The app only enables OIDC when all vars are set.
+          ], empty(oidcClientId) ? [] : [
+            { name: 'OIDC_CLIENT_ID', value: oidcClientId }
+            { name: 'OIDC_TENANT_ID', value: oidcTenantId }
+            { name: 'OIDC_REDIRECT_URI', value: oidcRedirectUri }
+          ], empty(cookieDomain) ? [] : [
+            { name: 'COOKIE_DOMAIN', value: cookieDomain }
           ])
           probes: [
             {
