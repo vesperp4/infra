@@ -8,9 +8,9 @@ param appGroup = 'tv'
 // Bumped automatically by the monorepo release pipeline (patch-bicepparam.sh).
 param imageTag = '0.2.2'
 
-// TODO: set once the TV Sanity project exists (sanity.io/manage). Until then
-// the engine runs schedule-less and can only serve slate.
-param sanityProjectId = ''
+// TV Sanity project (org "Vesper P4", created 2026-07-02). Public dataset,
+// read-only GROQ — the id is not a secret.
+param sanityProjectId = 'uphuxt07'
 
 // Produced by the first tv-packager-dev run (2026-07-02) from a generated
 // SMPTE-bars clip; with no Sanity project wired yet the engine loops this,
