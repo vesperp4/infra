@@ -6,7 +6,7 @@ param appName = 'tv-engine'
 param appGroup = 'tv'
 
 // Bumped automatically by the monorepo release pipeline (patch-bicepparam.sh).
-param imageTag = '0.2.1'
+param imageTag = '0.2.2'
 
 // TODO: set once the TV Sanity project exists (sanity.io/manage). Until then
 // the engine runs schedule-less and can only serve slate.
