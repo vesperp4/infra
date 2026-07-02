@@ -101,6 +101,106 @@ runner's IP (GitHub runners aren't covered by `AllowAzureServices`), removed on 
 > `https://ossrdbms-aad.database.windows.net/.default` and passes it as the
 > connection password (sqlx custom connect options). The dev team wires this.
 
+## portal-api custom domain + Entra app registration (out-of-band)
+
+The portal API binds `api.portal.dev.vesperp4.com` (dev) and
+`api.portal.vesperp4.com` (prod) with **Azure managed certificates**, so the
+session cookie (`.portal.<root>`) is same-site with the portal SWA. Managed-cert
+binding is inherently **two-phase** — the cert can't exist before the hostname
+is added and validated — so, like the SWA custom domains, it's bound
+out-of-band and then **pinned** in the env's `portal-api.bicepparam` so ARM PUT
+redeploys don't strip the binding. Run steps 1–4 **per env**; step 5 (the app
+registration) is done once and shared.
+
+### 1. Cloudflare DNS
+
+Both records **DNS-only (grey cloud)** — required for managed-cert issuance
+*and* renewal; an orange-cloud proxy hides the CNAME from Azure's validation.
+
+```bash
+# The verification ID for the asuid TXT record:
+az containerapp show -n portal-api-<env> -g vesperp4-<env>-rg \
+  --query properties.customDomainVerificationId -o tsv
+```
+
+| Type | Name | Value |
+|---|---|---|
+| CNAME | `api.portal.dev` (dev) / `api.portal` (prod) | the Container App's default FQDN (`az containerapp show ... --query properties.configuration.ingress.fqdn`) |
+| TXT | `asuid.api.portal.dev` (dev) / `asuid.api.portal` (prod) | the `customDomainVerificationId` above |
+
+### 2. Add the hostname
+
+```bash
+az containerapp hostname add -n portal-api-<env> -g vesperp4-<env>-rg \
+  --hostname api.portal.dev.vesperp4.com   # prod: api.portal.vesperp4.com
+```
+
+### 3. Create the managed certificate (on the shared environment)
+
+```bash
+az containerapp env certificate create -g vesperp4-<env>-rg \
+  --name vesperp4-<env>-cae \
+  --hostname api.portal.dev.vesperp4.com \
+  --validation-method CNAME
+```
+
+Issuance takes a few minutes; note the certificate's **resource ID** from the
+output (or `az containerapp env certificate list`).
+
+### 4. Bind, then pin
+
+```bash
+az containerapp hostname bind -n portal-api-<env> -g vesperp4-<env>-rg \
+  --hostname api.portal.dev.vesperp4.com \
+  --certificate <cert resource ID>
+```
+
+Then record the cert resource ID as `apiCustomDomainCertificateId` in
+`apps/<env>/portal/portal-api.bicepparam` — that's what keeps the binding
+declared on subsequent deploys.
+
+### 5. Entra app registration (once, in the vesperp4 tenant)
+
+```bash
+az ad app create --display-name "VESPER P4 Member Portal" \
+  --sign-in-audience AzureADMultipleOrgs \
+  --web-redirect-uris \
+    https://api.portal.vesperp4.com/api/v1/auth/oidc/callback \
+    https://api.portal.dev.vesperp4.com/api/v1/auth/oidc/callback \
+    http://localhost:8080/api/v1/auth/oidc/callback
+```
+
+- Add the **`email` optional claim** to the ID token (Entra portal → Token
+  configuration, or `az ad app update --id <appId>` with `optionalClaims`).
+- **No client secret.** Create a **federated identity credential** per env on
+  the app registration, trusting the app runtime identities:
+
+  ```bash
+  # subject = the identity's principalId:
+  az identity show -n id-app-<env> -g vesperp4-shared-rg --query principalId -o tsv
+
+  az ad app federated-credential create --id <appId> --parameters '{
+    "name": "id-app-<env>",
+    "issuer": "https://login.microsoftonline.com/4cb021ac-682f-419c-9bf1-dba159e55bb9/v2.0",
+    "subject": "<principalId>",
+    "audiences": ["api://AzureADTokenExchange"]
+  }'
+  ```
+
+- Pin the registration's **appId** as `oidcClientId` in both envs' param files.
+
+`oidcTenantId` is **PUPR's tenant GUID, not the vesperp4 tenant** — members
+sign in with their `@pupr.edu` accounts. Discover it from the issuer in:
+
+```bash
+curl -s https://login.microsoftonline.com/pupr.edu/.well-known/openid-configuration
+```
+
+> **PUPR-side consent caveat:** if PUPR restricts user consent, the first
+> sign-in fails until a PUPR admin grants tenant-wide consent at
+> `https://login.microsoftonline.com/<pupr-tenant>/adminconsent?client_id=<appId>`.
+> The magic-link flow works regardless, so sign-in isn't blocked on PUPR IT.
+
 ## Conventions
 
 - Region `eastus2`, subscription `1e180171-becb-40cd-a4a0-52351087be66`.

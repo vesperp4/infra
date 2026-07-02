@@ -24,3 +24,11 @@ param postgresAdminPassword = az.getSecret(
   'vesperp4-dev-kv',
   'portal-pg-admin-password'
 )
+
+// Custom domain (api.portal.dev.vesperp4.com) + Microsoft OIDC sign-in — pinned
+// AFTER the out-of-band runbook (README §"portal-api custom domain + Entra app
+// registration (out-of-band)") completes for this env; same two-phase pattern
+// as the SWA custom domains. Uncomment and fill in with the recorded values:
+param apiCustomDomainCertificateId = '/subscriptions/1e180171-becb-40cd-a4a0-52351087be66/resourceGroups/vesperp4-dev-rg/providers/Microsoft.App/managedEnvironments/vesperp4-dev-cae/managedCertificates/mc-vesperp4-dev-r-api-portal-dev-v-3007'
+param oidcClientId = 'aa2064af-8e60-40ab-8be8-28fa7ccd6ca1'
+param oidcTenantId = '72b8c91b-4089-4b60-996f-922c73865584'
