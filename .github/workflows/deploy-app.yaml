@@ -12,9 +12,12 @@ on:
     paths:
       - 'bicep/app.bicep'
       - 'bicep/web.bicep'
+      - 'bicep/tv-engine.bicep'
+      - 'bicep/tv-packager.bicep'
       - 'bicep/modules/containerapp.bicep'
       - 'bicep/modules/postgres.bicep'
       - 'bicep/modules/staticwebapp.bicep'
+      - 'bicep/modules/storage.bicep'
       - 'apps/**/*.bicepparam'
       - 'scripts/onboard-app-db.sh'
       - '.github/workflows/deploy-app.yaml'
@@ -46,7 +49,7 @@ jobs:
           set -euo pipefail
           # A change to the shared app template/modules/script redeploys every app;
           # otherwise only the app param files that changed in this push.
-          shared_re='^(bicep/(app|web)\.bicep|bicep/modules/(containerapp|postgres|staticwebapp)\.bicep|scripts/onboard-app-db\.sh|\.github/workflows/deploy-app\.yaml)$'
+          shared_re='^(bicep/(app|web|tv-engine|tv-packager)\.bicep|bicep/modules/(containerapp|postgres|staticwebapp|storage)\.bicep|scripts/onboard-app-db\.sh|\.github/workflows/deploy-app\.yaml)$'
           if [ "$EVENT" = "workflow_dispatch" ] || [ -z "${BEFORE:-}" ] \
              || [ "$BEFORE" = "0000000000000000000000000000000000000000" ] \
              || ! git rev-parse --verify "${BEFORE}^{commit}" >/dev/null 2>&1; then
