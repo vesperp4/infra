@@ -146,14 +146,20 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
           ])
           probes: [
             {
+              // Process-only: /livez does no DB I/O, so a transient Postgres
+              // blip can't fail liveness and trigger a restart storm of
+              // healthy replicas. DB health gates traffic via readiness below.
               type: 'Liveness'
               httpGet: {
-                path: '/health'
+                path: '/livez'
                 port: targetPort
               }
               periodSeconds: 30
             }
             {
+              // DB-aware: /health returns 503 when Postgres is unreachable, so
+              // the revision is pulled from rotation until the DB recovers
+              // instead of being killed.
               type: 'Readiness'
               httpGet: {
                 path: '/health'
