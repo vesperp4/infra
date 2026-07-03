@@ -14,7 +14,7 @@ param databaseName = 'portal'
 param postgresLocation = 'centralus'
 
 // Bumped automatically by the prod-promotion workflow (patch-bicepparam.sh).
-param imageTag = '0.8.0'
+param imageTag = '0.8.1'
 
 // Admin password for this app's Postgres server, read from Key Vault at deploy
 // time by the deploy identity (Key Vault Secrets User). Seeded per the runbook.
