@@ -24,6 +24,9 @@ param administratorLogin string
 @secure()
 param administratorLoginPassword string
 
+@description('Allow built-in password sign-in. Default false: runtime uses passwordless Entra auth only, so password auth is an attack surface with no legitimate user. Set true per-env only as a transient break-glass measure (the admin login/password above stay provisioned so the flag is a one-line flip).')
+param passwordAuthEnabled bool = false
+
 @description('Application database name')
 param databaseName string
 
@@ -59,11 +62,12 @@ resource pg 'Microsoft.DBforPostgreSQL/flexibleServers@2024-08-01' = {
     storage: {
       storageSizeGB: storageSizeGB
     }
-    // Passwordless-first: Entra auth is the preferred path; password auth stays
-    // enabled as an escape hatch and can be set to 'Disabled' to harden.
+    // Passwordless-first: Entra auth is the only path used by the runtime and
+    // CI. Password auth is disabled by default (no legitimate password user
+    // exists) and gated behind `passwordAuthEnabled` for transient break-glass.
     authConfig: {
       activeDirectoryAuth: 'Enabled'
-      passwordAuth: 'Enabled'
+      passwordAuth: passwordAuthEnabled ? 'Enabled' : 'Disabled'
       tenantId: tenantId
     }
     backup: {
