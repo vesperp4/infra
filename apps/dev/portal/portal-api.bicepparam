@@ -14,7 +14,7 @@ param databaseName = 'portal'
 param postgresLocation = 'centralus'
 
 // Bumped automatically by the monorepo release pipeline (patch-bicepparam.sh).
-param imageTag = '0.8.1'
+param imageTag = '0.8.2'
 
 // Admin password for this app's Postgres server, read from Key Vault at deploy
 // time by the deploy identity (Key Vault Secrets User). Seeded per the runbook.
