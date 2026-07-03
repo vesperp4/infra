@@ -23,10 +23,6 @@ on:
       - '.github/workflows/deploy-app.yaml'
   workflow_dispatch:
 
-concurrency:
-  group: deploy-app-${{ github.ref }}
-  cancel-in-progress: false
-
 permissions:
   contents: read
   id-token: write # Azure OIDC login
@@ -84,6 +80,16 @@ jobs:
       matrix: ${{ fromJson(needs.discover.outputs.matrix) }}
     # Sets the env-scoped AZURE_CLIENT_ID and (for prod) the reviewer gate.
     environment: ${{ matrix.environment }}
+    # Serialize per component+environment, not per workflow run: a prod job
+    # waiting on reviewer approval must never hold up dev deploys (the old
+    # workflow-level group deadlocked exactly that way — see issue #28).
+    # appGroup is part of the key because component names repeat across groups
+    # (mainsite/web, portal/web, tv/web). cancel-in-progress stays false so a
+    # mid-flight Postgres deploy is never killed; GitHub still supersedes an
+    # older *queued* run in the same group with the newer one.
+    concurrency:
+      group: deploy-app-${{ matrix.appGroup }}-${{ matrix.app }}-${{ matrix.environment }}
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
       - name: Azure login (OIDC)

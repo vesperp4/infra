@@ -13,10 +13,6 @@ on:
       - '.github/workflows/deploy-platform.yaml'
   workflow_dispatch:
 
-concurrency:
-  group: deploy-platform-${{ github.ref }}
-  cancel-in-progress: false
-
 permissions:
   contents: read
   id-token: write # Azure OIDC login
@@ -49,6 +45,11 @@ jobs:
     if: ${{ needs.changes.outputs.dev == 'true' || github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     environment: dev
+    # Per-environment lock (not workflow-level): a prod job waiting on reviewer
+    # approval must never queue-block dev — see issue #28.
+    concurrency:
+      group: deploy-platform-dev
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
       - name: Azure login (OIDC)
@@ -69,6 +70,9 @@ jobs:
     if: ${{ needs.changes.outputs.prod == 'true' || github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     environment: prod # required-reviewer approval gate
+    concurrency:
+      group: deploy-platform-prod
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
       - name: Azure login (OIDC)
