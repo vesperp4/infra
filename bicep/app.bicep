@@ -52,6 +52,9 @@ param postgresSkuTier string = 'Burstable'
 
 param postgresStorageSizeGB int = 32
 
+@description('Allow built-in Postgres password sign-in. Default false (passwordless Entra only); flip to true in a bicepparam for transient break-glass, then revert.')
+param postgresPasswordAuthEnabled bool = false
+
 param minReplicas int = (environment == 'prod') ? 1 : 0
 param maxReplicas int = (environment == 'prod') ? 3 : 1
 
@@ -122,6 +125,7 @@ module postgres 'modules/postgres.bicep' = {
     location: postgresLocation
     administratorLogin: postgresAdminLogin
     administratorLoginPassword: postgresAdminPassword
+    passwordAuthEnabled: postgresPasswordAuthEnabled
     databaseName: databaseName
     skuName: postgresSkuName
     skuTier: postgresSkuTier
