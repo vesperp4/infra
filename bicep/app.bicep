@@ -72,13 +72,15 @@ param oidcClientId string = ''
 param oidcTenantId string = ''
 
 // Public domain layout is deterministic: prod lives at the apex, dev under the
-// `dev.` subdomain. The portal web app hosts the /confirm page, so the
-// verification link (PUBLIC_BASE_URL) points there. The mainsite (join form)
-// and portal (confirm page) origins both call this API from the browser, so
-// both are CORS-allowed. Bound out-of-band as SWA custom domains (see README).
+// `dev.` subdomain. The portal web app hosts the signup/confirm pages, so the
+// verification link (PUBLIC_BASE_URL) points there. Only the portal origin
+// calls this API from the browser — the mainsite does not (its "join" links to
+// the portal; contact is a mailto). CORS is credentialed, so the allowlist must
+// stay portal-only: adding the mainsite would let any script there read a
+// signed-in member's data with the session cookie. Bound out-of-band as SWA
+// custom domains (see README).
 var rootDomain = (environment == 'prod') ? 'vesperp4.com' : 'dev.vesperp4.com'
 var portalOrigin = 'https://portal.${rootDomain}'
-var mainsiteOrigin = 'https://${rootDomain}'
 // The API's custom domain sits under the portal subtree so the session cookie
 // can be same-site with the portal SWA: `.portal.<root>` covers both
 // portal.<root> and api.portal.<root>. Deliberately NOT `.vesperp4.com` — the
@@ -173,10 +175,11 @@ module app 'modules/containerapp.bicep' = {
     // Passwordless ACS email — endpoint + verified sender from the module above.
     acsEndpoint: acsEmail.outputs.endpoint
     acsSenderAddress: acsEmail.outputs.senderAddress
-    // Verification links point at this env's portal; the join form + confirm
-    // page origins are CORS-allowed so the SWA→API browser calls work.
+    // Verification links point at this env's portal; only the portal origin is
+    // CORS-allowed so the SWA→API browser calls work (credentialed — keep it
+    // portal-only; see the domain-layout note above).
     publicBaseUrl: portalOrigin
-    corsAllowedOrigins: '${mainsiteOrigin},${portalOrigin}'
+    corsAllowedOrigins: portalOrigin
     // Custom domain — hostname + managed cert are bound out-of-band (README
     // runbook); the module only declares the binding once the cert ID is
     // pinned in this env's .bicepparam, so both are safe to pass always.
