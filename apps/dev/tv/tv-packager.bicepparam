@@ -6,4 +6,4 @@ param appName = 'tv-packager'
 param appGroup = 'tv'
 
 // Bumped automatically by the monorepo release pipeline (patch-bicepparam.sh).
-param imageTag = '0.2.0'
+param imageTag = '0.3.0'
