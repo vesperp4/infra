@@ -6,7 +6,7 @@ param appName = 'tv-engine'
 param appGroup = 'tv'
 
 // Bumped automatically by the monorepo release pipeline (patch-bicepparam.sh).
-param imageTag = '0.2.3'
+param imageTag = '0.3.0'
 
 // TV Sanity project (org "Vesper P4", created 2026-07-02). Public dataset,
 // read-only GROQ — the id is not a secret.
