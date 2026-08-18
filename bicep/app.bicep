@@ -71,6 +71,16 @@ param oidcClientId string = ''
 @description('Tenant GUID the API validates OIDC sign-ins against — PUPR\'s tenant, NOT the vesperp4 tenant (see the runbook for discovery)')
 param oidcTenantId string = ''
 
+@description('''Branded ACS sender domain for this env, e.g. vesperp4.com. Empty (the
+default) keeps the free Azure-managed DoNotReply@<guid>.azurecomm.net sender.
+Deliberately NOT derived from `rootDomain`: dev's root is a CNAME to the Static Web
+App, and DNS forbids a CNAME alongside the TXT records an ACS custom domain needs,
+so dev has no usable sender domain and stays Azure-managed.''')
+param acsCustomDomainName string = ''
+
+@description('Flip true only once the ACS custom domain reports Verified for all four record types (README runbook); links the domain and cuts the sender over')
+param acsCustomDomainVerified bool = false
+
 // Public domain layout is deterministic: prod lives at the apex, dev under the
 // `dev.` subdomain. The portal web app hosts the signup/confirm pages, so the
 // verification link (PUBLIC_BASE_URL) points there. Only the portal origin
@@ -151,6 +161,11 @@ module acsEmail 'modules/acs-email.bicep' = {
     // RG Contributor and can't write role assignments. See README for the
     // `az role assignment create` (scope = acsResourceId output).
     grantSenderRole: false
+    // Branded sender, two-phase (README: "ACS branded sender domain"). The
+    // existing send-access grant is scoped to the ACS resource, which is not
+    // replaced here, so adding a domain needs no new role assignment.
+    customDomainName: acsCustomDomainName
+    customDomainVerified: acsCustomDomainVerified
   }
 }
 
@@ -210,3 +225,5 @@ output acsSenderAddress string = acsEmail.outputs.senderAddress
 //   az role assignment create --assignee <appIdentity clientId> \
 //     --role Contributor --scope <acsResourceId>
 output acsResourceId string = acsEmail.outputs.acsResourceId
+// Needed by the branded-sender runbook's `az communication email domain` calls.
+output acsEmailServiceName string = acsEmail.outputs.emailServiceName

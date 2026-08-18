@@ -32,3 +32,10 @@ param postgresAdminPassword = az.getSecret(
 param apiCustomDomainCertificateId = '/subscriptions/1e180171-becb-40cd-a4a0-52351087be66/resourceGroups/vesperp4-prod-rg/providers/Microsoft.App/managedEnvironments/vesperp4-prod-cae/managedCertificates/mc-vesperp4-prod--api-portal-vespe-6809'
 param oidcClientId = 'aa2064af-8e60-40ab-8be8-28fa7ccd6ca1'
 param oidcTenantId = '72b8c91b-4089-4b60-996f-922c73865584'
+
+// Branded transactional sender, noreply@vesperp4.com (roadmap item #5). Phase 1:
+// this line alone only creates the unverified domain resource and changes nothing
+// the app sends as. Phase 2 is adding `param acsCustomDomainVerified = true` after
+// the README runbook reports all four record types Verified.
+// Dev has no equivalent: dev.vesperp4.com is a CNAME and cannot hold the records.
+param acsCustomDomainName = 'vesperp4.com'
