@@ -201,6 +201,101 @@ curl -s https://login.microsoftonline.com/pupr.edu/.well-known/openid-configurat
 > `https://login.microsoftonline.com/<pupr-tenant>/adminconsent?client_id=<appId>`.
 > The magic-link flow works regardless, so sign-in isn't blocked on PUPR IT.
 
+## ACS branded sender domain (out-of-band)
+
+The portal's transactional mail (verification links, magic-link sign-in) goes out
+through ACS. By default that is `DoNotReply@<guid>.azurecomm.net`, which is fine
+mechanically but looks like nothing to do with us on the one message a new member
+is asked to trust. Setting `acsCustomDomainName` moves prod to
+`noreply@vesperp4.com`.
+
+**Prod only.** Dev stays Azure-managed on purpose: `dev.vesperp4.com` is a CNAME
+to the Static Web App, and DNS forbids a CNAME coexisting with other record types,
+so it cannot hold the TXT records an ACS custom domain requires. A dev equivalent
+would need a different name such as `mail.dev.vesperp4.com`.
+
+Like the managed certs above this is **two-phase**, because Azure only emits the
+records to publish once the domain resource exists. Phase 1 (`acsCustomDomainName`
+set) is inert: the domain is created unverified, unlinked, and unused, and mail
+keeps flowing from the managed sender. Phase 2 (`acsCustomDomainVerified = true`)
+links it and cuts the sender over.
+
+### 1. Read the records Azure generated
+
+After the phase-1 deploy lands:
+
+```bash
+az communication email domain show \
+  --domain-name vesperp4.com --email-service-name portal-prod-email \
+  --resource-group vesperp4-prod-rg --query properties.verificationRecords
+```
+
+### 2. Publish them in Cloudflare
+
+All **DNS-only (grey cloud)**. Values come from step 1; the DKIM targets are
+fixed, the domain-verification value is generated per domain.
+
+| Type | Name | Value |
+|---|---|---|
+| TXT | `@` | the `Domain` verification value from step 1 |
+| CNAME | `selector1-azurecomm-prod-net._domainkey` | `selector1-azurecomm-prod-net._domainkey.azurecomm.net` |
+| CNAME | `selector2-azurecomm-prod-net._domainkey` | `selector2-azurecomm-prod-net._domainkey.azurecomm.net` |
+
+> **Do not add the SPF record Azure lists.** It asks for
+> `v=spf1 include:spf.protection.outlook.com -all`, which the zone already
+> publishes for Microsoft 365, because ACS sends through the same infrastructure.
+> Two SPF TXT records on one name is a permerror that breaks SPF for *all* mail
+> from the domain, mailboxes included.
+
+> These DKIM hostnames do not collide with the Microsoft 365 ones
+> (`selector1._domainkey` / `selector2._domainkey`). Both pairs coexist in the
+> zone, signing different senders.
+
+### 3. Verify each record type
+
+```bash
+for t in Domain SPF DKIM DKIM2; do
+  az communication email domain initiate-verification \
+    --domain-name vesperp4.com --email-service-name portal-prod-email \
+    --resource-group vesperp4-prod-rg --verification-type "$t"
+done
+
+az communication email domain show \
+  --domain-name vesperp4.com --email-service-name portal-prod-email \
+  --resource-group vesperp4-prod-rg --query properties.verificationStates
+```
+
+All four must read `Verified` before continuing. DNS changes take 15 to 30
+minutes to be visible to Azure's validator.
+
+### 4. Cut the sender over
+
+Add to `apps/prod/portal/portal-api.bicepparam` and merge:
+
+```bicep
+param acsCustomDomainVerified = true
+```
+
+This links the domain and sets `ACS_SENDER_ADDRESS` to `noreply@vesperp4.com`.
+The Azure-managed domain stays linked, so reverting is flipping this one flag
+back rather than a redeploy.
+
+### 5. Confirm
+
+Trigger a real portal verification email to an external address and read
+`Authentication-Results`: want `dkim=pass` with `header.d=vesperp4.com` and
+`dmarc=pass`. Until this ships, portal mail is outside `vesperp4.com`'s DMARC
+scope entirely (its From domain is `azurecomm.net`), so it never appears in the
+domain's aggregate reports. After it ships it is in scope, and must pass before
+the DMARC policy is tightened past `p=none`.
+
+> **Replies to `noreply@` bounce.** The MX is Microsoft 365, so a reply hits
+> Exchange and gets an NDR because no such mailbox exists. Add a shared mailbox
+> or a transport rule if replies should land somewhere.
+
+> No new role assignment is needed. The out-of-band send-access grant is scoped
+> to the ACS resource, which this change does not replace.
+
 ## Conventions
 
 - Region `eastus2`, subscription `1e180171-becb-40cd-a4a0-52351087be66`.

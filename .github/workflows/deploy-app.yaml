@@ -14,6 +14,7 @@ on:
       - 'bicep/web.bicep'
       - 'bicep/tv-engine.bicep'
       - 'bicep/tv-packager.bicep'
+      - 'bicep/modules/acs-email.bicep'
       - 'bicep/modules/containerapp.bicep'
       - 'bicep/modules/postgres.bicep'
       - 'bicep/modules/staticwebapp.bicep'
