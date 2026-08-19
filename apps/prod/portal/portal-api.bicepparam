@@ -33,9 +33,10 @@ param apiCustomDomainCertificateId = '/subscriptions/1e180171-becb-40cd-a4a0-523
 param oidcClientId = 'aa2064af-8e60-40ab-8be8-28fa7ccd6ca1'
 param oidcTenantId = '72b8c91b-4089-4b60-996f-922c73865584'
 
-// Branded transactional sender, noreply@vesperp4.com (roadmap item #5). Phase 1:
-// this line alone only creates the unverified domain resource and changes nothing
-// the app sends as. Phase 2 is adding `param acsCustomDomainVerified = true` after
-// the README runbook reports all four record types Verified.
+// Branded transactional sender, noreply@vesperp4.com (roadmap item #5). Domain,
+// SPF, DKIM and DKIM2 all report Verified, so the flag below links the domain and
+// cuts the sender over. Setting it back to false reverts to the Azure-managed
+// sender without a re-verification, which is why that domain stays linked.
 // Dev has no equivalent: dev.vesperp4.com is a CNAME and cannot hold the records.
 param acsCustomDomainName = 'vesperp4.com'
+param acsCustomDomainVerified = true
