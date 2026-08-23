@@ -15,9 +15,11 @@ param environment = 'prod'
 // Commenting this back out removes the action group and silences every rule,
 // which is the intended kill switch.
 //
-// param alertsRelayUrl = az.getSecret(
-//   '1e180171-becb-40cd-a4a0-52351087be66',
-//   'vesperp4-prod-rg',
-//   'vesperp4-prod-kv',
-//   'alerts-relay-url'
-// )
+// Phase 1 done: the Worker is deployed at
+// vesperp4-alerts-relay.vesper-p4.workers.dev and the secret is seeded.
+param alertsRelayUrl = az.getSecret(
+  '1e180171-becb-40cd-a4a0-52351087be66',
+  'vesperp4-prod-rg',
+  'vesperp4-prod-kv',
+  'alerts-relay-url'
+)
