@@ -40,3 +40,17 @@ param oidcTenantId = '72b8c91b-4089-4b60-996f-922c73865584'
 // Dev has no equivalent: dev.vesperp4.com is a CNAME and cannot hold the records.
 param acsCustomDomainName = 'vesperp4.com'
 param acsCustomDomainVerified = true
+
+// Alerting, phase 2. The action group is created by platform/prod.bicepparam;
+// naming it here is what creates this app's rules (see bicep/modules/app-alerts.bicep).
+// Deploy the platform FIRST: the rules reference this action group by resource ID and
+// Azure rejects a rule whose action group does not exist yet.
+//
+// Clearing this line removes the rules and leaves the app otherwise untouched.
+param alertsActionGroupName = 'vesperp4-prod-ag'
+
+// The ACS delivery-status rule stays off until its table has rows. Azure validates
+// alert queries at deploy time, and ACSEmailStatusUpdateOperational does not exist
+// until the diagnostic setting added in this change has been live long enough to
+// emit some. Confirm with `ACSEmailStatusUpdateOperational | take 10`, then flip.
+param acsDeliveryAlertEnabled = false
