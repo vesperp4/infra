@@ -9,6 +9,7 @@ on:
     paths:
       - 'bicep/platform.bicep'
       - 'bicep/modules/containerapps-env.bicep'
+      - 'bicep/modules/alerts-action-group.bicep'
       - 'platform/*.bicepparam'
       - '.github/workflows/deploy-platform.yaml'
   workflow_dispatch:
@@ -32,11 +33,13 @@ jobs:
             dev:
               - 'bicep/platform.bicep'
               - 'bicep/modules/containerapps-env.bicep'
+              - 'bicep/modules/alerts-action-group.bicep'
               - '.github/workflows/deploy-platform.yaml'
               - 'platform/dev.bicepparam'
             prod:
               - 'bicep/platform.bicep'
               - 'bicep/modules/containerapps-env.bicep'
+              - 'bicep/modules/alerts-action-group.bicep'
               - '.github/workflows/deploy-platform.yaml'
               - 'platform/prod.bicepparam'
 

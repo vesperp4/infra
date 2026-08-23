@@ -81,6 +81,15 @@ param acsCustomDomainName string = ''
 @description('Flip true only once the ACS custom domain reports Verified for all four record types (README runbook); links the domain and cuts the sender over')
 param acsCustomDomainVerified bool = false
 
+@description('''Action group that this app's alert rules notify, e.g. vesperp4-prod-ag.
+Empty (the default) creates no alert rules at all, so an env whose platform has
+not enabled alerting deploys exactly as before. Take the value from
+platform.bicep's `actionGroupName` output.''')
+param alertsActionGroupName string = ''
+
+@description('Enable the ACS delivery-status alert. Off until its query is confirmed against a workspace with rows; see modules/app-alerts.bicep.')
+param acsDeliveryAlertEnabled bool = false
+
 // Public domain layout is deterministic: prod lives at the apex, dev under the
 // `dev.` subdomain. The portal web app hosts the signup/confirm pages, so the
 // verification link (PUBLIC_BASE_URL) points there. Only the portal origin
@@ -99,6 +108,12 @@ var apiDomain = 'api.portal.${rootDomain}'
 var cookieDomain = '.portal.${rootDomain}'
 
 var caeName = 'vesperp4-${environment}-cae'
+var lawName = 'vesperp4-${environment}-log'
+// Built by name rather than looked up as an `existing` resource, so the empty
+// case does not need a conditional resource reference.
+var actionGroupId = empty(alertsActionGroupName)
+  ? ''
+  : resourceId('Microsoft.Insights/actionGroups', alertsActionGroupName)
 // DB region is part of the server name: self-documenting, and collision-proof
 // when the DB region differs from compute (Azure caches a name->region mapping
 // in the RG, so a failed create in one region blocks recreating it in another).
@@ -126,6 +141,12 @@ resource deployIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-0
 
 resource cae 'Microsoft.App/managedEnvironments@2024-03-01' existing = {
   name: caeName
+}
+
+// The per-env workspace behind the Container Apps environment (platform.bicep).
+// Alert queries run against it, so it is looked up rather than passed in.
+resource law 'Microsoft.OperationalInsights/workspaces@2023-09-01' existing = {
+  name: lawName
 }
 
 // ---------- This app's dedicated PostgreSQL server + database ----------
@@ -209,6 +230,23 @@ module app 'modules/containerapp.bicep' = {
     oidcRedirectUri: 'https://${apiDomain}/api/v1/auth/oidc/callback'
     cookieDomain: cookieDomain
   }
+}
+
+// ---------- Observability ----------
+
+module appAlerts 'modules/app-alerts.bicep' = {
+  name: '${appName}-alerts'
+  params: {
+    workspaceId: law.id
+    location: location
+    actionGroupId: actionGroupId
+    acsName: '${appGroup}-${environment}-acs'
+    containerAppName: containerAppName
+    acsDeliveryAlertEnabled: acsDeliveryAlertEnabled
+  }
+  // The diagnostic setting attaches to the ACS resource the module above
+  // creates; without this, ARM may order them the other way round.
+  dependsOn: [acsEmail]
 }
 
 // Prefer the custom domain once its cert is pinned; the default FQDN otherwise.

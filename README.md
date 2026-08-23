@@ -21,11 +21,12 @@ infra/
 │   └── modules/
 ├── bicep/
 │   ├── platform.bicep    Per-env SHARED platform: Container Apps environment
-│   │                     (+ Log Analytics). Compute substrate only.
+│   │                     (+ Log Analytics) and the alert action group.
 │   ├── app.bicep         API component: its OWN PostgreSQL server + database +
 │   │                     the Container App
 │   ├── web.bicep         Web component: an Azure Static Web App (no database)
-│   └── modules/          postgres, containerapps-env, containerapp, staticwebapp
+│   └── modules/          postgres, containerapps-env, containerapp, staticwebapp,
+│                         alerts-action-group, app-alerts
 ├── platform/            <env>.bicepparam — shared platform params per env
 ├── apps/
 │   ├── dev/             <app-group>/<component>.bicepparam (api: pinned imageTag)
@@ -296,6 +297,46 @@ the DMARC policy is tightened past `p=none`.
 > No new role assignment is needed. The out-of-band send-access grant is scoped
 > to the ACS resource, which this change does not replace.
 
+## Alerting to Slack (two-phase)
+
+Azure Monitor has no Slack receiver: its webhook receiver POSTs Azure's own JSON
+and a Slack Incoming Webhook accepts only Slack's. The action group here points
+at **alerts-relay**, a Cloudflare Worker in the monorepo
+(`apps/ops/alerts-relay`), which translates and forwards. `useCommonAlertSchema`
+must stay `true`; the relay parses only that schema.
+
+Alerting is opt-in per environment and comes up in two phases, so each step is
+inert on its own:
+
+**Phase 1: the route out.** Deploy the Worker, then store its full URL,
+*including* the `?token=...` that authenticates the caller, in the env's Key
+Vault as `alerts-relay-url`. Uncomment `alertsRelayUrl` in
+`platform/<env>.bicepparam` and deploy the platform. That creates the action
+group and nothing else. No alert exists yet, so nothing can fire.
+
+**Phase 2: the rules.** Set `alertsActionGroupName = 'vesperp4-<env>-ag'` in each
+app's `.bicepparam`. `bicep/modules/app-alerts.bicep` then creates that app's
+rules. Apps that do not set it deploy exactly as before.
+
+Commenting `alertsRelayUrl` back out is the kill switch for the whole thing.
+
+> The relay URL is a credential, because the token is in the query string. A
+> webhook receiver takes a URI and cannot set headers, so there is nowhere else
+> to put it. It lives in Key Vault, never in git.
+
+**ACS diagnostic settings are separate and on by default.** They are additive,
+cheap, and the reason they exist is that `az monitor diagnostic-settings list`
+on `portal-prod-acs` returned empty during the 2026-08-19 signup triage, which
+made "was this message delivered" unanswerable after the fact.
+
+The ACS delivery-status alert (`acsDeliveryAlertEnabled`) stays off until its
+query is confirmed against a workspace that has rows. Azure validates alert
+queries at deploy time, so pointing at a table that does not exist yet fails the
+deployment rather than creating a dormant rule.
+
+Full picture, including the GitHub and Sanity routes: monorepo
+`docs/alerting.md`.
+
 ## Conventions
 
 - Region `eastus2`, subscription `1e180171-becb-40cd-a4a0-52351087be66`.
@@ -310,3 +351,4 @@ the DMARC policy is tightened past `p=none`.
 - Identity/foundation rationale: [`bootstrap/README.md`](./bootstrap/README.md)
 - Human identity & access (groups, break-glass): monorepo `docs/entra-identity.md`
 - Pipeline overview: monorepo `docs/cicd-pipeline.md` and `docs/infra-repo-spec.md`
+- Alerting routes and setup: monorepo `docs/alerting.md`
